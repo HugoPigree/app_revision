@@ -16,6 +16,8 @@ export interface AskOptions {
   confirmLabel?: string;
   cancelLabel?: string | null; // null = pas de bouton Annuler (simple info)
   danger?: boolean;
+  /** Plusieurs choix (empilés) au lieu de OK / Annuler */
+  choices?: { value: string; label: string; primary?: boolean; danger?: boolean }[];
 }
 
 export interface UI {
@@ -25,6 +27,8 @@ export interface UI {
   toast: (msg: string) => void;
   /** Confirmation intégrée à l'app (remplace window.confirm, peu fiable dans une web app installée) */
   ask: (opts: AskOptions) => Promise<boolean>;
+  /** Comme ask, avec plusieurs choix : renvoie la valeur choisie, ou null si annulé */
+  choose: (opts: AskOptions) => Promise<string | null>;
 }
 
 export function useMedia(query: string): boolean {
@@ -43,28 +47,39 @@ export const DESKTOP = '(min-width: 900px)';
 export const UIContext = createContext<UI | null>(null);
 export const useUI = () => useContext(UIContext)!;
 
-export function ConfirmDialog({ opts, onAnswer }: { opts: AskOptions; onAnswer: (ok: boolean) => void }) {
+export function ConfirmDialog({ opts, onAnswer }: { opts: AskOptions; onAnswer: (value: string | null) => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onAnswer(false);
-      if (e.key === 'Enter') onAnswer(true);
+      if (e.key === 'Escape') onAnswer(null);
+      if (e.key === 'Enter' && !opts.choices) onAnswer('ok');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onAnswer]);
+  }, [onAnswer, opts.choices]);
   return (
-    <div className="confirm-backdrop" onClick={() => onAnswer(false)}>
+    <div className="confirm-backdrop" onClick={() => onAnswer(null)}>
       <div className="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(e) => e.stopPropagation()}>
         <h3 id="confirm-title">{opts.title}</h3>
         {opts.message && <p>{opts.message}</p>}
-        <div className="confirm-actions">
-          {opts.cancelLabel !== null && (
-            <button className="btn secondary" onClick={() => onAnswer(false)}>{opts.cancelLabel ?? 'Annuler'}</button>
-          )}
-          <button className={`btn ${opts.danger ? 'danger' : 'primary'}`} onClick={() => onAnswer(true)} autoFocus>
-            {opts.confirmLabel ?? 'OK'}
-          </button>
-        </div>
+        {opts.choices ? (
+          <div className="confirm-choices">
+            {opts.choices.map((c) => (
+              <button key={c.value} className={`btn ${c.danger ? 'danger' : c.primary ? 'primary' : 'secondary'}`} onClick={() => onAnswer(c.value)}>
+                {c.label}
+              </button>
+            ))}
+            <button className="btn ghost" onClick={() => onAnswer(null)}>{opts.cancelLabel ?? 'Annuler'}</button>
+          </div>
+        ) : (
+          <div className="confirm-actions">
+            {opts.cancelLabel !== null && (
+              <button className="btn secondary" onClick={() => onAnswer(null)}>{opts.cancelLabel ?? 'Annuler'}</button>
+            )}
+            <button className={`btn ${opts.danger ? 'danger' : 'primary'}`} onClick={() => onAnswer('ok')} autoFocus>
+              {opts.confirmLabel ?? 'OK'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

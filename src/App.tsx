@@ -27,7 +27,7 @@ export default function App() {
   const [review, setReview] = useState<ReviewCtx | null>(() => loadRun()?.ctx ?? null);
   const [toast, setToast] = useState<{ msg: string; n: number } | null>(null);
   const [asking, setAsking] = useState<AskOptions | null>(null);
-  const resolver = useRef<((ok: boolean) => void) | null>(null);
+  const resolver = useRef<((value: string | null) => void) | null>(null);
   const [, bump] = useState(0);
 
   useEffect(() => {
@@ -40,14 +40,15 @@ export default function App() {
     navigator.storage?.persist?.().catch(() => {});
   }, []);
 
-  const ask = useCallback((opts: AskOptions) => {
-    resolver.current?.(false);
+  const choose = useCallback((opts: AskOptions) => {
+    resolver.current?.(null);
     setAsking(opts);
-    return new Promise<boolean>((resolve) => { resolver.current = resolve; });
+    return new Promise<string | null>((resolve) => { resolver.current = resolve; });
   }, []);
+  const ask = useCallback((opts: AskOptions) => choose(opts).then((v) => v === 'ok'), [choose]);
 
-  const answer = useCallback((ok: boolean) => {
-    resolver.current?.(ok);
+  const answer = useCallback((value: string | null) => {
+    resolver.current?.(value);
     resolver.current = null;
     setAsking(null);
   }, []);
@@ -74,7 +75,8 @@ export default function App() {
     startReview: (ctx) => { void startReview(ctx); },
     toast: (msg) => setToast({ msg, n: Date.now() }),
     ask,
-  }), [startReview, ask]);
+    choose,
+  }), [startReview, ask, choose]);
 
   return (
     <UIContext.Provider value={ui}>

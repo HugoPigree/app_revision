@@ -7,7 +7,7 @@ PWA hors ligne : une fois installée sur l'iPhone, elle s'ouvre comme une vraie 
 
 ## Ce que fait la v1
 
-- **Planning** : vue semaine (par défaut) et vue jour. Tap sur un créneau vide → nouvelle tâche à cette heure.
+- **Planning** : vue semaine (par défaut) et vue jour. Tap sur un créneau vide → nouvelle tâche à cette heure. Glisser-déposer pour déplacer une tâche (à la souris, ou appui long au doigt ; dépose sur un jour du bandeau du haut pour changer de jour en gardant l'heure).
 - **Tâches** : ponctuelles ou récurrentes (jours fixes, toutes les X semaines, ou tous les X jours, avec date de fin optionnelle). Type *Révision* ou *Activité*, catégories en couleur.
 - **Mode révision (Pomodoro)** : pomodoros de travail + pauses (25/5 par défaut, grande pause tous les 4 pomodoros, réglable). Le pomodoro suivant ne démarre que quand tu le relances, donc seul le vrai temps de travail est compté. L'écran reste allumé pendant un pomodoro et la séance survit si tu fermes l'app.
 - **Bilan** : temps de révision par semaine/mois (avec comparaison), par jour, par catégorie, par sujet, taux de révisions faites.
@@ -58,5 +58,5 @@ src/
 ## Limites connues
 
 - Pas de notifications : une PWA hors ligne ne peut pas envoyer de rappels fiables sur iPhone. Le son de fin de bloc ne joue que si l'app est ouverte.
-- Modifier une tâche récurrente change toutes ses répétitions (on ne peut pas encore déplacer une seule occurrence ; on peut la retirer).
+- Modifier une tâche récurrente depuis sa fiche change toutes ses répétitions. Pour un seul jour, fais-la glisser dans le planning et choisis « Ce jour seulement ».
 - Pas de synchro entre appareils.

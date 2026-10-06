@@ -149,6 +149,13 @@ p { margin: 0; }
 .event .ev-title svg { vertical-align: -2px; margin-right: 2px; }
 .event .ev-meta { font-size: 12px; color: color-mix(in srgb, var(--ink) 70%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .event.narrow .ev-title { visibility: hidden; }
+.event { touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.event.drag-src { opacity: 0.3; }
+.event.ghost { z-index: 6; pointer-events: none; box-shadow: var(--shadow); outline: 2px solid var(--c); background: color-mix(in srgb, var(--c) 28%, var(--surface)); }
+.event.ghost .ev-meta { display: block; font-weight: 600; }
+.cal-grid.dragging, .cal-grid.dragging * { cursor: grabbing !important; }
+.day-cell.drop-target .dn { background: var(--accent); color: var(--accent-ink); }
+@media (hover: hover) { .event { cursor: grab; } }
 .event.done { opacity: 0.55; }
 .event.done .ev-title { text-decoration: line-through; text-decoration-thickness: 1px; }
 .event.missed {
@@ -361,6 +368,7 @@ p { margin: 0; }
 .confirm { width: 100%; max-width: 340px; background: var(--surface); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); animation: pop .18s cubic-bezier(.2,.9,.3,1); }
 .confirm h3 { font-size: 18px; font-weight: 700; }
 .confirm p { color: var(--muted); font-size: 15px; line-height: 1.4; }
+.confirm-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .confirm-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; margin-top: 10px; }
 @keyframes pop { from { transform: scale(0.94); opacity: 0; } }
 
