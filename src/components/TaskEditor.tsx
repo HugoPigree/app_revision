@@ -24,6 +24,9 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const [t, setT] = useState<Task>(base);
   const [newCat, setNewCat] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const catName = cats.find((c) => c.id === t.categoryId)?.name;
+  // Sans titre, la tâche prend le nom de sa catégorie
+  const fallbackTitle = catName ?? (t.type === 'revision' ? 'Révision' : 'Activité');
   const set = (patch: Partial<Task>) => setT((p) => ({ ...p, ...patch }));
   const rec = t.recurrence;
 
@@ -40,11 +43,10 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   };
 
   const save = async () => {
-    if (!t.title.trim()) return setError('Donne un titre à la tâche.');
     if (rec.kind === 'weekly' && rec.days.length === 0) return setError('Choisis au moins un jour.');
     if (t.endDate && t.endDate < t.startDate) return setError('La date de fin est avant la date de début.');
     if (!t.durationMin || t.durationMin < 5) return setError('Durée minimale : 5 minutes.');
-    await db.tasks.put({ ...t, title: t.title.trim() });
+    await db.tasks.put({ ...t, title: t.title.trim() || fallbackTitle });
     ui.toast(task ? 'Tâche modifiée' : 'Tâche ajoutée');
     onClose();
   };
@@ -76,7 +78,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
       <div className="form">
         <input
           className="title-input"
-          placeholder={t.type === 'revision' ? 'Ex. Maths — chapitre 3' : 'Ex. Salle de sport'}
+          placeholder={`Titre (facultatif) · ${fallbackTitle}`}
           value={t.title}
           onChange={(e) => set({ title: e.target.value })}
           autoFocus={!task}
