@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCategories, useSettings } from '../db';
-import { addDays, dateRange, DAY_LETTERS, fmtLongDay, fmtMonth, fromKey, minToTime, nowMin, startOfWeek, todayKey, weekday } from '../lib/dates';
+import { addDays, dateRange, DAY_LETTERS, DAY_SHORT, fmtLongDay, fmtMonth, fromKey, minToTime, nowMin, startOfWeek, todayKey, weekday } from '../lib/dates';
 import { useOccurrences, type Occurrence } from '../lib/recurrence';
-import { Icon, useUI } from '../ui';
+import { DESKTOP, Icon, useMedia, useUI } from '../ui';
 
 interface Placed { occ: Occurrence; lane: number; lanes: number }
 
@@ -38,13 +38,14 @@ export function CalendarView() {
   const [date, setDate] = useState(todayKey());
   const [, setTick] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const desktop = useMedia(DESKTOP);
 
   const today = todayKey();
   const weekStart = startOfWeek(date);
   const weekDays = dateRange(weekStart, addDays(weekStart, 6));
   const occs = useOccurrences(weekStart, addDays(weekStart, 6)) ?? [];
   const shown = view === 'week' ? weekDays : [date];
-  const H = view === 'week' ? 46 : 60;
+  const H = desktop ? (view === 'week' ? 54 : 64) : view === 'week' ? 46 : 60;
 
   const { startH, endH } = useMemo(() => {
     let s = settings.dayStartHour, e = settings.dayEndHour;
@@ -102,7 +103,7 @@ export function CalendarView() {
                 className={`day-cell ${active ? 'active' : ''} ${d === today ? 'is-today' : ''}`}
                 onClick={() => { setDate(d); setView('day'); }}
               >
-                <span className="dl">{DAY_LETTERS[weekday(d)]}</span>
+                <span className="dl">{desktop ? DAY_SHORT[weekday(d)] : DAY_LETTERS[weekday(d)]}</span>
                 <span className="dn">{fromKey(d).getDate()}</span>
                 <span className="dots">
                   {dots.slice(0, 3).map((o) => (
@@ -138,7 +139,7 @@ export function CalendarView() {
                   return (
                     <button
                       key={occ.key}
-                      className={`event ${occ.status} ${view} ${occ.task.type}`}
+                      className={`event ${occ.status} ${view} ${occ.task.type} ${view === 'week' && !desktop && lanes > 1 ? 'narrow' : ''}`}
                       style={{
                         top, height,
                         left: `calc(${(lane / lanes) * 100}% + 1px)`,
@@ -151,10 +152,10 @@ export function CalendarView() {
                         {occ.status === 'done' && <Icon name="check" size={12} />}
                         {occ.task.title}
                       </span>
-                      {view === 'day' && height > 34 && (
+                      {(view === 'day' || desktop) && height > 34 && (
                         <span className="ev-meta">
                           {minToTime(occ.start)} – {minToTime(occ.end)}
-                          {cat ? ` · ${cat.name}` : ''}
+                          {cat && view === 'day' ? ` · ${cat.name}` : ''}
                           {occ.status === 'missed' ? ' · non fait' : ''}
                         </span>
                       )}

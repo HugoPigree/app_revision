@@ -1,14 +1,16 @@
 # Cadence — planning & révisions (v1)
 
-App perso pour organiser tes journées, tes révisions et tes activités récurrentes.
+App perso pour organiser tes journées, tes révisions et tes activités récurrentes. Pensée d'abord pour le téléphone, avec une mise en page dédiée sur ordinateur (barre latérale, calendrier large).
+
+En ligne : https://cadence-eosin-chi.vercel.app (déployée automatiquement par Vercel à chaque push sur `main`).
 PWA hors ligne : une fois installée sur l'iPhone, elle s'ouvre comme une vraie app, avec son icône, même en mode avion.
 
 ## Ce que fait la v1
 
 - **Planning** : vue semaine (par défaut) et vue jour. Tap sur un créneau vide → nouvelle tâche à cette heure.
 - **Tâches** : ponctuelles ou récurrentes (jours fixes, toutes les X semaines, ou tous les X jours, avec date de fin optionnelle). Type *Révision* ou *Activité*, catégories en couleur.
-- **Mode révision** : blocs de travail + pauses (25/5 par défaut, grande pause tous les 4 blocs, réglable), consignes de rappel actif, note de maîtrise de 1 à 5 en fin de séance, et proposition de la prochaine révision (répétition espacée). Le bloc suivant ne démarre que quand tu le relances, donc seul le vrai temps de travail est compté. L'écran reste allumé pendant un bloc et la séance survit si tu fermes l'app.
-- **Bilan** : temps de révision par semaine/mois (avec comparaison), par jour, par catégorie, taux de révisions faites, chapitres à retravailler en priorité.
+- **Mode révision (Pomodoro)** : pomodoros de travail + pauses (25/5 par défaut, grande pause tous les 4 pomodoros, réglable). Le pomodoro suivant ne démarre que quand tu le relances, donc seul le vrai temps de travail est compté. L'écran reste allumé pendant un pomodoro et la séance survit si tu fermes l'app.
+- **Bilan** : temps de révision par semaine/mois (avec comparaison), par jour, par catégorie, par sujet, taux de révisions faites.
 - **Réglages** : durées des blocs, plage horaire du calendrier, catégories, export/import d'une sauvegarde JSON.
 
 Toutes les données restent sur le téléphone (IndexedDB). Pense à exporter une sauvegarde de temps en temps.
@@ -43,12 +45,11 @@ Stack : Vite + React 18 + TypeScript, Dexie (IndexedDB), vite-plugin-pwa (servic
 src/
   db.ts                    modèle de données (catégories, tâches, occurrences, séances, réglages)
   lib/recurrence.ts        calcul des répétitions et statuts (fait / pas fait / à venir)
-  lib/spaced.ts            intervalles de répétition espacée selon la maîtrise
   lib/backup.ts            export / import JSON
   components/Calendar.tsx  vues semaine et jour
   components/TaskEditor.tsx
   components/OccurrenceSheet.tsx
-  components/Review.tsx    mode révision (minuteur, fin de séance, prochaine révision)
+  components/Review.tsx    mode révision Pomodoro (minuteur, fin de séance)
   components/Tasks.tsx
   components/Stats.tsx     bilan
   components/SettingsView.tsx

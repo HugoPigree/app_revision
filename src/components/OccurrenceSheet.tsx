@@ -2,7 +2,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteTask, setOccStatus, useCategories } from '../db';
 import { fmtDuration, fmtLongDay, minToTime } from '../lib/dates';
 import { describeRecurrence, type Occurrence } from '../lib/recurrence';
-import { MASTERY_LABELS } from '../lib/spaced';
 import { Icon, Sheet, useUI } from '../ui';
 
 export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: () => void }) {
@@ -13,7 +12,6 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
   const recurring = task.recurrence.kind !== 'none';
   const sessions = useLiveQuery(() => db.sessions.where('taskId').equals(task.id!).toArray(), [task.id]) ?? [];
   const sessionsHere = sessions.filter((s) => s.occKey === occ.key);
-  const lastMastery = [...sessions].sort((a, b) => b.endedAt - a.endedAt).find((s) => s.mastery)?.mastery;
 
   const toggleDone = async () => {
     await setOccStatus(task.id!, occ.date, occ.status === 'done' ? null : 'done');
@@ -26,7 +24,7 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
       await setOccStatus(task.id!, occ.date, 'skipped');
       ui.toast('Occurrence retirée du planning');
     } else {
-      if (!confirm('Supprimer cette tâche ?')) return;
+      if (!(await ui.ask({ title: 'Supprimer cette tâche ?', confirmLabel: 'Supprimer', danger: true }))) return;
       await deleteTask(task.id!);
       ui.toast('Tâche supprimée');
     }
@@ -35,7 +33,7 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
 
   const startReview = () => {
     onClose();
-    ui.startReview({ taskId: task.id!, occKey: occ.key, date: occ.date, title: task.title, categoryId: task.categoryId, srInterval: task.srInterval });
+    ui.startReview({ taskId: task.id!, occKey: occ.key, date: occ.date, title: task.title, categoryId: task.categoryId });
   };
 
   return (
@@ -57,7 +55,6 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
           {occ.status === 'missed' && 'Pas fait'}
           {occ.status === 'upcoming' && 'À venir'}
           {sessionsHere.length > 0 && ` · ${fmtDuration(sessionsHere.reduce((a, s) => a + s.workMinutes, 0))} de révision`}
-          {isRev && lastMastery ? ` · dernière maîtrise : ${lastMastery}/5 (${MASTERY_LABELS[lastMastery]})` : ''}
         </div>
 
         <div className="actions">

@@ -51,8 +51,13 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
 
   const remove = async () => {
     if (!task?.id) return;
-    const msg = task.recurrence.kind === 'none' ? 'Supprimer cette tâche ?' : 'Supprimer cette tâche et toutes ses répétitions ?';
-    if (!confirm(msg)) return;
+    const ok = await ui.ask({
+      title: 'Supprimer cette tâche ?',
+      message: task.recurrence.kind === 'none' ? undefined : 'Toutes ses répétitions seront supprimées du planning.',
+      confirmLabel: 'Supprimer',
+      danger: true,
+    });
+    if (!ok) return;
     await deleteTask(task.id);
     ui.toast('Tâche supprimée');
     onClose();
@@ -86,7 +91,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
         </div>
         <p className="hint">
           {t.type === 'revision'
-            ? 'Une révision se lance en mode révision (blocs + pauses) et compte dans ton bilan.'
+            ? 'Une révision se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.'
             : 'Une activité se coche simplement comme faite (sport, cours, boulot…).'}
         </p>
 

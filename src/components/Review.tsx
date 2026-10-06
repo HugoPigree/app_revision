@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db, setOccStatus, useCategories, useSettings, type Settings } from '../db';
-import { addDays, fmtDuration, fmtShort, todayKey } from '../lib/dates';
-import { MASTERY_LABELS, nextInterval } from '../lib/spaced';
+import { fmtDuration, todayKey } from '../lib/dates';
 import { Icon, useUI, type ReviewCtx } from '../ui';
 
 type Phase = 'ready' | 'work' | 'short' | 'long' | 'finished';
@@ -63,20 +62,6 @@ function advance(r: Run, now: number): { run: Run; event: 'workEnd' | 'breakEnd'
   return { run, event };
 }
 
-const WORK_TIPS = [
-  'Ferme ton cours. Écris sur une feuille blanche tout ce dont tu te souviens.',
-  'Fais un exercice sans regarder la correction, puis corrige-toi.',
-  'Explique la notion à voix haute, comme si tu la présentais à quelqu’un.',
-  'Écris 3 questions d’examen possibles et réponds-y de mémoire.',
-  'Refais de tête le schéma ou la démonstration clé du chapitre.',
-];
-const BREAK_TIPS = [
-  'Lève-toi, bouge, bois de l’eau. Évite les réseaux : ton cerveau consolide.',
-  'Regarde au loin par la fenêtre quelques minutes, sans écran.',
-  'Étire-toi et respire. La pause fait partie de la méthode.',
-];
-const LONG_BREAK_TIP = 'Grande pause : sors de ta pièce, mange un truc, marche un peu. Pas d’écran si possible.';
-
 let audio: AudioContext | null = null;
 function unlockAudio() {
   try {
@@ -120,9 +105,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
     return existing && existing.ctx.occKey === ctx.occKey && existing.ctx.taskId === ctx.taskId ? existing : newRun(ctx, settings);
   });
   const [now, setNow] = useState(Date.now());
-  const [mastery, setMastery] = useState<number | null>(null);
-  const [saved, setSaved] = useState<{ interval: number; date: string } | null>(null);
-  const [customDate, setCustomDate] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Horloge
   useEffect(() => {
@@ -174,20 +157,37 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
   };
   const skipBreak = () => setRun({ ...run, phase: 'ready', pausedLeft: null });
 
-  const finish = () => {
+  const finish = async () => {
     const extra = run.phase === 'work' ? run.phaseDur - remaining : 0;
     const workMs = run.workMs + extra;
     if (workMs < 60_000) {
-      if (!confirm('Moins d’une minute de travail : abandonner la séance sans l’enregistrer ?')) return;
+      const ok = await ui.ask({
+        title: 'Abandonner la séance ?',
+        message: 'Moins d’une minute de travail : rien ne sera enregistré.',
+        confirmLabel: 'Abandonner',
+        cancelLabel: 'Continuer',
+        danger: true,
+      });
+      if (!ok) return;
       saveRun(null);
       onDone();
       return;
     }
-    if (run.phase === 'work' && !confirm('Terminer la séance maintenant ? Le bloc en cours sera compté au prorata.')) return;
-    setRun({ ...run, workMs, phase: 'finished', pausedLeft: null });
+    if (run.phase === 'work') {
+      const ok = await ui.ask({
+        title: 'Terminer la séance ?',
+        message: 'Le pomodoro en cours sera compté au prorata du temps passé.',
+        confirmLabel: 'Terminer',
+        cancelLabel: 'Continuer',
+      });
+      if (!ok) return;
+    }
+    setRun({ ...run, workMs: run.workMs + (run.phase === 'work' ? run.phaseDur - (run.pausedLeft ?? Math.max(0, run.phaseEnd - Date.now())) : 0), phase: 'finished', pausedLeft: null });
   };
 
-  const save = async (m: number | null = mastery) => {
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
     const workMinutes = Math.round(run.workMs / 60_000);
     await db.sessions.add({
       taskId: ctx.taskId,
@@ -199,35 +199,18 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
       endedAt: Date.now(),
       workMinutes,
       blocks: run.blocks,
-      mastery: m,
+      mastery: null,
     });
     if (ctx.taskId && ctx.occKey) await setOccStatus(ctx.taskId, ctx.date, 'done');
     saveRun(null);
-    if (ctx.taskId && m) {
-      const interval = nextInterval(ctx.srInterval, m);
-      setSaved({ interval, date: addDays(todayKey(), interval) });
-    } else {
-      ui.toast(`Séance enregistrée : ${fmtDuration(workMinutes)}`);
-      onDone();
-    }
+    ui.toast(`Séance enregistrée : ${fmtDuration(workMinutes)}`);
+    onDone();
   };
 
-  const planNext = async (date: string, interval: number) => {
-    const src = ctx.taskId ? await db.tasks.get(ctx.taskId) : undefined;
-    await db.tasks.add({
-      title: ctx.title,
-      type: 'revision',
-      categoryId: ctx.categoryId,
-      startDate: date,
-      startTime: src?.startTime ?? '18:00',
-      durationMin: src?.durationMin ?? 60,
-      recurrence: { kind: 'none' },
-      endDate: null,
-      notes: src?.notes ?? '',
-      srInterval: interval,
-      createdAt: Date.now(),
-    });
-    ui.toast(`Révision planifiée ${fmtShort(date)}`);
+  const discard = async () => {
+    const ok = await ui.ask({ title: 'Supprimer cette séance ?', message: 'Elle ne comptera pas dans ton bilan.', confirmLabel: 'Supprimer', danger: true });
+    if (!ok) return;
+    saveRun(null);
     onDone();
   };
 
@@ -239,33 +222,16 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
         <div className="review-inner">
           <p className="eyebrow">Séance terminée</p>
           <h1 className="big-num">{fmtDuration(workMinutes)}</h1>
-          <p className="muted center">de travail effectif · {run.blocks} bloc{run.blocks > 1 ? 's' : ''} complet{run.blocks > 1 ? 's' : ''}</p>
+          <p className="muted center">de travail effectif sur <strong>{ctx.title}</strong></p>
 
-          {!saved ? (
-            <>
-              <h3 className="q">Sans regarder tes notes, tu maîtrises <em>{ctx.title}</em> à quel point ?</h3>
-              <div className="mastery">
-                {[1, 2, 3, 4, 5].map((m) => (
-                  <button key={m} className={mastery === m ? 'on' : ''} onClick={() => setMastery(m)}>
-                    <b>{m}</b>
-                    <span>{MASTERY_LABELS[m]}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="hint center">Ta note sert à planifier la prochaine révision au bon moment (répétition espacée).</p>
-              <button className="btn primary big" onClick={() => save()} disabled={!mastery && !!ctx.taskId}>Enregistrer la séance</button>
-              {ctx.taskId && <button className="btn ghost" onClick={() => void save(null)}>Enregistrer sans noter</button>}
-            </>
-          ) : (
-            <div className="next-card">
-              <p className="eyebrow">Prochaine révision conseillée</p>
-              <h2>Dans {saved.interval} jour{saved.interval > 1 ? 's' : ''}</h2>
-              <p className="muted">{capitalize(fmtShort(customDate ?? saved.date))}</p>
-              <input type="date" value={customDate ?? saved.date} min={addDays(todayKey(), 1)} onChange={(e) => e.target.value && setCustomDate(e.target.value)} />
-              <button className="btn primary big" onClick={() => planNext(customDate ?? saved.date, saved.interval)}>Ajouter au planning</button>
-              <button className="btn ghost" onClick={() => { ui.toast('Séance enregistrée'); onDone(); }}>Pas maintenant</button>
-            </div>
-          )}
+          <div className="finish-stats">
+            <div><b>{run.blocks}</b><span>pomodoro{run.blocks > 1 ? 's' : ''} complet{run.blocks > 1 ? 's' : ''}</span></div>
+            <div><b>{Math.max(0, Math.round((Date.now() - run.startedAt) / 60_000))}<small> min</small></b><span>durée totale, pauses comprises</span></div>
+          </div>
+          <div className="controls">
+            <button className="btn primary big" onClick={save} disabled={saving}>Enregistrer la séance</button>
+            <button className="btn danger-ghost" onClick={discard}>Ne pas enregistrer</button>
+          </div>
         </div>
       </div>
     );
@@ -275,14 +241,10 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
   const isBreak = run.phase === 'short' || run.phase === 'long';
   const nextBlock = run.blocks + 1;
   const label =
-    run.phase === 'work' ? `Concentration · bloc ${nextBlock}`
+    run.phase === 'work' ? `Pomodoro ${nextBlock}`
     : run.phase === 'short' ? 'Pause courte'
     : run.phase === 'long' ? 'Grande pause'
-    : run.blocks === 0 ? 'Prêt à démarrer' : `Prêt pour le bloc ${nextBlock}`;
-  const tip =
-    run.phase === 'long' ? LONG_BREAK_TIP
-    : isBreak ? BREAK_TIPS[run.blocks % BREAK_TIPS.length]
-    : WORK_TIPS[run.blocks % WORK_TIPS.length];
+    : run.blocks === 0 ? 'Prêt à démarrer' : `Prêt pour le pomodoro ${nextBlock}`;
   const R = 118, C = 2 * Math.PI * R;
   const fresh = run.blocks === 0 && run.workMs === 0 && run.phase === 'ready';
   const cfg = fresh ? cfgFrom(settings) : run.cfg;
@@ -317,16 +279,11 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
           </div>
         </div>
 
-        <div className="tip">
-          <span className="tip-label">{isBreak ? 'Pendant la pause' : 'Rappel actif'}</span>
-          <p>{tip}</p>
-        </div>
-
         <p className="muted center small">Travail effectif : {fmtDuration(totalWorkMin)}</p>
 
         <div className="controls">
           {run.phase === 'ready' && (
-            <button className="btn primary big" onClick={startBlock}><Icon name="play" size={18} /> {run.blocks === 0 ? 'Commencer' : `Lancer le bloc ${nextBlock}`} ({cfg.work} min)</button>
+            <button className="btn primary big" onClick={startBlock}><Icon name="play" size={18} /> {run.blocks === 0 ? 'Commencer' : `Lancer le pomodoro ${nextBlock}`} ({cfg.work} min)</button>
           )}
           {timed(run.phase) && (run.pausedLeft === null
             ? <button className="btn secondary big" onClick={pause}><Icon name="pause" size={18} /> Pause</button>
@@ -336,7 +293,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
             <button className="btn ghost" onClick={finish}><Icon name="stop" size={16} /> Terminer la séance</button>
           )}
           {run.phase === 'ready' && run.blocks === 0 && (
-            <p className="hint center">{cfg.work} min de travail, {cfg.short} min de pause, grande pause de {cfg.long} min tous les {cfg.every} blocs.</p>
+            <p className="hint center">{cfg.work} min de travail, {cfg.short} min de pause, grande pause de {cfg.long} min tous les {cfg.every} pomodoros.</p>
           )}
         </div>
       </div>
@@ -364,4 +321,3 @@ export function ReviewBanner({ onOpen }: { onOpen: (ctx: ReviewCtx) => void }) {
   );
 }
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

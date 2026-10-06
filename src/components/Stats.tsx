@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { db, useCategories, type Session } from '../db';
 import { addDays, addMonths, dateRange, DAY_LETTERS, endOfMonth, fmtDuration, fmtMonth, fmtShort, fromKey, relativeDay, startOfMonth, startOfWeek, todayKey, weekday } from '../lib/dates';
 import { expand } from '../lib/recurrence';
-import { MASTERY_LABELS } from '../lib/spaced';
 import { Icon } from '../ui';
 
 type Mode = 'week' | 'month';
@@ -26,15 +25,14 @@ export function StatsView() {
   const today = todayKey();
 
   const data = useLiveQuery(async () => {
-    const [sessions, all, tasks, states] = await Promise.all([
+    const [sessions, tasks, states] = await Promise.all([
       db.sessions.where('date').between(prevFrom, to, true, true).toArray(),
-      db.sessions.toArray(),
       db.tasks.where('type').equals('revision').toArray(),
       db.occStates.where('date').between(from, to, true, true).toArray(),
     ]);
     const end = to < today ? to : today;
     const occs = from <= end ? expand(tasks, states, from, end) : [];
-    return { sessions, all, occs };
+    return { sessions, occs };
   }, [from, to, prevFrom, today]);
 
   const step = (dir: number) => setAnchor(mode === 'week' ? addDays(from, 7 * dir) : addMonths(from, dir));
@@ -46,8 +44,7 @@ export function StatsView() {
   const prevTotal = prev.reduce((a, s) => a + s.workMinutes, 0);
   const delta = total - prevTotal;
   const blocks = cur.reduce((a, s) => a + s.blocks, 0);
-  const rated = cur.filter((s) => s.mastery);
-  const avgMastery = rated.length ? rated.reduce((a, s) => a + (s.mastery ?? 0), 0) / rated.length : null;
+  const avgSession = cur.length ? total / cur.length : null;
 
   const occs = data?.occs ?? [];
   const done = occs.filter((o) => o.status === 'done').length;
@@ -67,10 +64,15 @@ export function StatsView() {
   const catRows = [...perCat.entries()].sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...catRows.map((r) => r[1]));
 
-  // Maîtrise par chapitre (dernière note connue, toutes périodes)
-  const lastByTitle = new Map<string, Session>();
-  [...(data?.all ?? [])].sort((a, b) => a.endedAt - b.endedAt).forEach((s) => s.mastery && lastByTitle.set(s.title, s));
-  const weakest = [...lastByTitle.values()].sort((a, b) => (a.mastery! - b.mastery!) || (a.endedAt - b.endedAt)).slice(0, 6);
+  // Temps par sujet (titre de la tâche)
+  const perTitle = new Map<string, { minutes: number; categoryId: number | null }>();
+  cur.forEach((s) => {
+    const e = perTitle.get(s.title) ?? { minutes: 0, categoryId: s.categoryId };
+    e.minutes += s.workMinutes;
+    perTitle.set(s.title, e);
+  });
+  const topics = [...perTitle.entries()].sort((a, b) => b[1].minutes - a[1].minutes).slice(0, 8);
+  const maxTopic = Math.max(1, ...topics.map((t) => t[1].minutes));
 
   const W = 340, CH = 150, padL = 30, padB = 22, chartH = CH - padB - 8;
   const bw = (W - padL) / days.length;
@@ -103,8 +105,8 @@ export function StatsView() {
 
         <div className="kpis">
           <div className="kpi"><b>{cur.length}</b><span>séance{cur.length > 1 ? 's' : ''}</span></div>
-          <div className="kpi"><b>{blocks}</b><span>bloc{blocks > 1 ? 's' : ''} complet{blocks > 1 ? 's' : ''}</span></div>
-          <div className="kpi"><b>{avgMastery ? avgMastery.toFixed(1) : '–'}<small>/5</small></b><span>maîtrise moy.</span></div>
+          <div className="kpi"><b>{blocks}</b><span>pomodoro{blocks > 1 ? 's' : ''} complet{blocks > 1 ? 's' : ''}</span></div>
+          <div className="kpi"><b>{avgSession ? fmtDuration(avgSession) : '–'}</b><span>par séance en moyenne</span></div>
           <div className="kpi"><b>{planned ? `${Math.round((done / planned) * 100)}%` : '–'}</b><span>{planned ? `${done}/${planned} révisions faites` : 'révisions faites'}</span></div>
         </div>
 
@@ -155,18 +157,16 @@ export function StatsView() {
           })}
         </section>
 
-        {weakest.length > 0 && (
+        {topics.length > 0 && (
           <section className="card">
-            <h2 className="section-title">À retravailler en priorité</h2>
-            <ul className="mastery-list">
-              {weakest.map((s) => (
-                <li key={s.title}>
-                  <span className="ml-title">{s.title}</span>
-                  <span className={`ml-score m${s.mastery}`}>{s.mastery}/5 · {MASTERY_LABELS[s.mastery!]}</span>
-                  <span className="muted small">{relativeDay(s.date)}</span>
-                </li>
-              ))}
-            </ul>
+            <h2 className="section-title">Par sujet</h2>
+            {topics.map(([title, t]) => (
+              <div key={title} className="hbar topic" style={{ ['--c' as string]: cats.get(t.categoryId ?? -1)?.color ?? 'var(--muted)' }}>
+                <span className="hbar-label" title={title}><i className="dot" />{title}</span>
+                <span className="hbar-track"><span style={{ width: `${(t.minutes / maxTopic) * 100}%` }} /></span>
+                <span className="hbar-val">{fmtDuration(t.minutes)}</span>
+              </div>
+            ))}
           </section>
         )}
 
@@ -178,7 +178,7 @@ export function StatsView() {
                 <li key={s.id} style={{ ['--c' as string]: cats.get(s.categoryId ?? -1)?.color ?? 'var(--muted)' }}>
                   <i className="dot" />
                   <span className="sl-title">{s.title}<span className="muted small">{relativeDay(s.date)}</span></span>
-                  <span className="sl-val">{fmtDuration(s.workMinutes)}{s.mastery ? ` · ${s.mastery}/5` : ''}</span>
+                  <span className="sl-val">{fmtDuration(s.workMinutes)}</span>
                 </li>
               ))}
             </ul>

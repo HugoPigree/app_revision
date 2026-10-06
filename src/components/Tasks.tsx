@@ -31,7 +31,6 @@ export function TasksView() {
       date: todayKey(),
       title: t.title,
       categoryId: t.categoryId,
-      srInterval: t.srInterval,
     });
 
   const Row = ({ t, next }: { t: Task; next: string | null }) => {

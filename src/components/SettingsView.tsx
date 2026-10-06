@@ -38,18 +38,20 @@ export function SettingsView() {
 
   const onImport = async (f: File | undefined) => {
     if (!f) return;
-    if (!confirm('Remplacer toutes tes données actuelles par cette sauvegarde ?')) return;
+    const ok = await ui.ask({ title: 'Restaurer cette sauvegarde ?', message: 'Toutes tes données actuelles seront remplacées.', confirmLabel: 'Remplacer', danger: true });
+    if (!ok) { if (fileRef.current) fileRef.current.value = ''; return; }
     try {
       await importData(f);
       ui.toast('Sauvegarde restaurée');
     } catch (e) {
-      alert((e as Error).message);
+      await ui.ask({ title: 'Import impossible', message: (e as Error).message, confirmLabel: 'OK', cancelLabel: null });
     }
     if (fileRef.current) fileRef.current.value = '';
   };
 
   const removeCat = async (id: number, name: string) => {
-    if (!confirm(`Supprimer la catégorie « ${name} » ? Les tâches liées resteront, sans catégorie.`)) return;
+    const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
+    if (!ok) return;
     await db.transaction('rw', db.categories, db.tasks, async () => {
       await db.categories.delete(id);
       await db.tasks.where('categoryId').equals(id).modify({ categoryId: null });
@@ -71,17 +73,17 @@ export function SettingsView() {
               </button>
             ))}
           </div>
-          <Stepper label="Bloc de travail" value={s.workMin} min={5} max={90} step={5} unit="min" onChange={(v) => update({ workMin: v })} />
+          <Stepper label="Pomodoro (travail)" value={s.workMin} min={5} max={90} step={5} unit="min" onChange={(v) => update({ workMin: v })} />
           <Stepper label="Pause courte" value={s.shortBreakMin} min={1} max={30} unit="min" onChange={(v) => update({ shortBreakMin: v })} />
           <Stepper label="Grande pause" value={s.longBreakMin} min={5} max={60} step={5} unit="min" onChange={(v) => update({ longBreakMin: v })} />
-          <Stepper label="Grande pause tous les" value={s.blocksBeforeLong} min={2} max={8} unit="blocs" onChange={(v) => update({ blocksBeforeLong: v })} />
+          <Stepper label="Grande pause tous les" value={s.blocksBeforeLong} min={2} max={8} unit="pomodoros" onChange={(v) => update({ blocksBeforeLong: v })} />
         </section>
 
         <section className="card method">
-          <h2 className="section-title">Comment marche le mode révision</h2>
-          <p><b>1. Rappel actif.</b> Pendant un bloc, tu essaies de restituer de mémoire (feuille blanche, exercices, questions) au lieu de relire. C’est l’une des techniques les plus efficaces d’après la recherche.</p>
-          <p><b>2. Répétition espacée.</b> À la fin, tu notes ta maîtrise de 1 à 5. L’app te propose la prochaine révision du chapitre : bientôt si c’est flou, de plus en plus tard si c’est acquis.</p>
-          <p><b>3. Blocs et pauses.</b> Des blocs courts et des pauses imposées t’aident à te lancer et à rester concentré sans saturer. Le bloc suivant ne démarre que quand tu le relances, pour que seul le vrai temps de travail compte.</p>
+          <h2 className="section-title">La méthode Pomodoro</h2>
+          <p><b>1. Un pomodoro.</b> Tu travailles sur une seule chose pendant un bloc (25 min par défaut), sans distraction.</p>
+          <p><b>2. Une pause courte.</b> À la fin du bloc, l’app sonne et lance la pause (5 min par défaut). Lève-toi, décroche de l’écran.</p>
+          <p><b>3. Une grande pause.</b> Après plusieurs pomodoros (4 par défaut), une pause plus longue. Le pomodoro suivant ne démarre que quand tu le relances, pour que seul le vrai temps de travail compte dans ton bilan.</p>
         </section>
 
         <section className="card">
@@ -115,7 +117,7 @@ export function SettingsView() {
 
         <section className="card">
           <h2 className="section-title">Données</h2>
-          <p className="muted small">Tout est stocké uniquement sur ce téléphone, rien n’est envoyé en ligne. Exporte une sauvegarde de temps en temps.</p>
+          <p className="muted small">Tout est stocké uniquement sur cet appareil, rien n’est envoyé en ligne. Ton téléphone et ton PC ont donc chacun leurs propres données. Exporte une sauvegarde de temps en temps.</p>
           {persisted === false && (
             <button className="btn ghost" onClick={async () => setPersisted((await navigator.storage?.persist?.()) ?? false)}>Protéger le stockage contre l’effacement automatique</button>
           )}

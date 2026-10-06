@@ -8,7 +8,14 @@ export interface ReviewCtx {
   date: string;
   title: string;
   categoryId: number | null;
-  srInterval?: number;
+}
+
+export interface AskOptions {
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string | null; // null = pas de bouton Annuler (simple info)
+  danger?: boolean;
 }
 
 export interface UI {
@@ -16,10 +23,52 @@ export interface UI {
   openOccurrence: (occ: Occurrence) => void;
   startReview: (ctx: ReviewCtx) => void;
   toast: (msg: string) => void;
+  /** Confirmation intégrée à l'app (remplace window.confirm, peu fiable dans une web app installée) */
+  ask: (opts: AskOptions) => Promise<boolean>;
 }
+
+export function useMedia(query: string): boolean {
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setMatch(m.matches);
+    on();
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+export const DESKTOP = '(min-width: 900px)';
 
 export const UIContext = createContext<UI | null>(null);
 export const useUI = () => useContext(UIContext)!;
+
+export function ConfirmDialog({ opts, onAnswer }: { opts: AskOptions; onAnswer: (ok: boolean) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onAnswer(false);
+      if (e.key === 'Enter') onAnswer(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onAnswer]);
+  return (
+    <div className="confirm-backdrop" onClick={() => onAnswer(false)}>
+      <div className="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" onClick={(e) => e.stopPropagation()}>
+        <h3 id="confirm-title">{opts.title}</h3>
+        {opts.message && <p>{opts.message}</p>}
+        <div className="confirm-actions">
+          {opts.cancelLabel !== null && (
+            <button className="btn secondary" onClick={() => onAnswer(false)}>{opts.cancelLabel ?? 'Annuler'}</button>
+          )}
+          <button className={`btn ${opts.danger ? 'danger' : 'primary'}`} onClick={() => onAnswer(true)} autoFocus>
+            {opts.confirmLabel ?? 'OK'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Sheet({ title, onClose, children }: { title?: string; onClose: () => void; children: ReactNode }) {
   const [closing, setClosing] = useState(false);
