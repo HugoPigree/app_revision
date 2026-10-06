@@ -459,3 +459,30 @@ p { margin: 0; }
 
   .toast { bottom: 32px; left: calc(50% + 110px); }
 }
+
+/* ——— Compte ——— */
+.app.splash { background: var(--bg); }
+.auth { min-height: 100dvh; display: grid; place-items: center; padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 24px); background: var(--bg); overflow-y: auto; }
+.auth-card { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+.auth-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; margin-bottom: 8px; }
+.auth-brand img { border-radius: 14px; box-shadow: var(--shadow); }
+.auth-brand h1 { font-size: 28px; font-weight: 800; }
+.auth-brand p { font-size: 15px; line-height: 1.4; max-width: 300px; }
+.auth-title { font-size: 20px; text-align: center; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-field span { font-size: 13px; font-weight: 650; color: var(--muted); }
+.auth-field input { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 48px; outline: none; }
+.auth-field input:focus { border-color: var(--accent); }
+.auth-info { font-size: 14px; line-height: 1.4; background: color-mix(in srgb, var(--rest) 12%, transparent); color: var(--rest); padding: 10px 12px; border-radius: 10px; }
+.small-link { font-size: 14px; flex-wrap: wrap; text-align: center; }
+.small-link .muted { font-weight: 500; }
+.account-row { display: flex; align-items: center; gap: 12px; }
+.avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 750; font-size: 18px; flex: none; }
+.account-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.account-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.sync-state i { width: 8px; height: 8px; border-radius: 50%; background: var(--rest); }
+.sync-state.syncing i { background: var(--accent); animation: blink 1s infinite; }
+.sync-state.offline i { background: var(--muted); }
+.sync-state.error i { background: var(--work); }
+@media (min-width: 900px) { .settings .account { grid-column: 1 / -1; } }

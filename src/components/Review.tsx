@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { db, setOccStatus, useCategories, useSettings, type Settings } from '../db';
+import { db, setOccStatus, uid, useCategories, useSettings, type Settings } from '../db';
 import { fmtDuration, todayKey } from '../lib/dates';
 import { Icon, useUI, type ReviewCtx } from '../ui';
 
@@ -99,7 +99,7 @@ const mmss = (ms: number) => {
 export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize: () => void; onDone: () => void }) {
   const settings = useSettings();
   const ui = useUI();
-  const cat = useCategories().get(ctx.categoryId ?? -1);
+  const cat = useCategories().get(ctx.categoryId ?? '');
   const [run, setRun] = useState<Run>(() => {
     const existing = loadRun();
     return existing && existing.ctx.occKey === ctx.occKey && existing.ctx.taskId === ctx.taskId ? existing : newRun(ctx, settings);
@@ -190,6 +190,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
     setSaving(true);
     const workMinutes = Math.round(run.workMs / 60_000);
     await db.sessions.add({
+      id: uid(),
       taskId: ctx.taskId,
       occKey: ctx.occKey,
       categoryId: ctx.categoryId,

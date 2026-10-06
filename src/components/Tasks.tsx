@@ -34,7 +34,7 @@ export function TasksView() {
     });
 
   const Row = ({ t, next }: { t: Task; next: string | null }) => {
-    const cat = cats.get(t.categoryId ?? -1);
+    const cat = cats.get(t.categoryId ?? '');
     return (
       <li className="task-row" style={{ ['--c' as string]: cat?.color ?? 'var(--muted)' }}>
         <button className="task-main" onClick={() => ui.openEditor(t)}>

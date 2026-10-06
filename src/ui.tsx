@@ -3,11 +3,11 @@ import type { Task } from './db';
 import type { Occurrence } from './lib/recurrence';
 
 export interface ReviewCtx {
-  taskId: number | null;
+  taskId: string | null;
   occKey: string | null;
   date: string;
   title: string;
-  categoryId: number | null;
+  categoryId: string | null;
 }
 
 export interface AskOptions {
@@ -27,6 +27,8 @@ export interface UI {
   toast: (msg: string) => void;
   /** Confirmation intégrée à l'app (remplace window.confirm, peu fiable dans une web app installée) */
   ask: (opts: AskOptions) => Promise<boolean>;
+  /** Ouvre l'écran de connexion / création de compte */
+  openAuth: () => void;
   /** Comme ask, avec plusieurs choix : renvoie la valeur choisie, ou null si annulé */
   choose: (opts: AskOptions) => Promise<string | null>;
 }

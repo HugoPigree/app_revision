@@ -1,4 +1,4 @@
-import { db, setOccStatus } from '../db';
+import { db, setOccStatus, uid } from '../db';
 import { addDays, daysBetween, minToTime, relativeDay, weekday } from './dates';
 import type { Occurrence } from './recurrence';
 import type { UI } from '../ui';
@@ -34,7 +34,7 @@ export async function moveOccurrence(ui: UI, occ: Occurrence, date: string, star
     // On retire ce jour de la série et on crée une tâche ponctuelle au nouvel emplacement
     const { id: _id, ...rest } = task;
     void _id;
-    const newId = await db.tasks.add({ ...rest, recurrence: { kind: 'none' }, startDate: date, startTime: time, endDate: null, createdAt: Date.now() });
+    const newId = await db.tasks.add({ ...rest, id: uid(), recurrence: { kind: 'none' }, startDate: date, startTime: time, endDate: null, createdAt: Date.now() });
     await setOccStatus(task.id!, occ.date, 'skipped');
     if (occ.status === 'done') await setOccStatus(newId, date, 'done');
     ui.toast(`Déplacée ${where} (ce jour seulement)`);

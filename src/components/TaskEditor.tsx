@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, deleteCategory, deleteTask, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
+import { db, deleteCategory, deleteTask, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -20,6 +20,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     notes: '',
     createdAt: Date.now(),
     ...defaults,
+    id: uid(),
   };
   const [t, setT] = useState<Task>(base);
   const [newCat, setNewCat] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     onClose();
   };
 
-  const removeCategory = async (id: number, name: string) => {
+  const removeCategory = async (id: string, name: string) => {
     const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
     if (!ok) return;
     await deleteCategory(id);
@@ -76,7 +77,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const addCategory = async () => {
     const name = newCat?.trim();
     if (!name) return setNewCat(null);
-    const id = await db.categories.add({ name, color: PALETTE[cats.length % PALETTE.length] });
+    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length] });
     set({ categoryId: id });
     setNewCat(null);
   };

@@ -208,7 +208,7 @@ export function CalendarView() {
                 <span className="dn">{fromKey(d).getDate()}</span>
                 <span className="dots">
                   {dots.slice(0, 3).map((o) => (
-                    <i key={o.key} style={{ background: cats.get(o.task.categoryId ?? -1)?.color ?? 'var(--muted)' }} />
+                    <i key={o.key} style={{ background: cats.get(o.task.categoryId ?? '')?.color ?? 'var(--muted)' }} />
                   ))}
                 </span>
               </button>
@@ -234,7 +234,7 @@ export function CalendarView() {
                 onClick={(e) => onGridTap(d, e)}
               >
                 {dayOccs.map(({ occ, lane, lanes }) => {
-                  const cat = cats.get(occ.task.categoryId ?? -1);
+                  const cat = cats.get(occ.task.categoryId ?? '');
                   const top = ((occ.start - startH * 60) / 60) * H;
                   const height = Math.max(((occ.end - occ.start) / 60) * H, 22);
                   return (
@@ -275,7 +275,7 @@ export function CalendarView() {
                   return (
                     <div
                       className={`event ghost ${view}`}
-                      style={{ top: ((drag.start - startH * 60) / 60) * H, height: Math.max((dur / 60) * H, 22), left: 1, width: 'calc(100% - 2px)', ['--c' as string]: cats.get(o.task.categoryId ?? -1)?.color ?? '#7b808a' }}
+                      style={{ top: ((drag.start - startH * 60) / 60) * H, height: Math.max((dur / 60) * H, 22), left: 1, width: 'calc(100% - 2px)', ['--c' as string]: cats.get(o.task.categoryId ?? '')?.color ?? '#7b808a' }}
                     >
                       <span className="ev-title">{o.task.title}</span>
                       <span className="ev-meta">{minToTime(drag.start)} – {minToTime(drag.start + dur)}</span>

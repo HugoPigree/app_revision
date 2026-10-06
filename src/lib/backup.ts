@@ -1,7 +1,7 @@
-import { db } from '../db';
+import { convertV1, db, DEFAULT_SETTINGS } from '../db';
 import { todayKey } from './dates';
 
-const VERSION = 1;
+const VERSION = 2;
 
 export async function exportData(): Promise<'shared' | 'downloaded'> {
   const data = {
@@ -37,16 +37,20 @@ export async function exportData(): Promise<'shared' | 'downloaded'> {
 }
 
 export async function importData(file: File): Promise<void> {
-  const data = JSON.parse(await file.text());
-  if (data?.app !== 'cadence' || !Array.isArray(data.tasks)) {
+  const raw = JSON.parse(await file.text());
+  if (raw?.app !== 'cadence' || !Array.isArray(raw.tasks)) {
     throw new Error("Ce fichier n'est pas une sauvegarde Cadence.");
   }
-  await db.transaction('rw', [db.categories, db.tasks, db.occStates, db.sessions, db.settings], async () => {
-    await Promise.all([db.categories.clear(), db.tasks.clear(), db.occStates.clear(), db.sessions.clear(), db.settings.clear()]);
-    await db.categories.bulkAdd(data.categories ?? []);
-    await db.tasks.bulkAdd(data.tasks ?? []);
-    await db.occStates.bulkAdd(data.occStates ?? []);
-    await db.sessions.bulkAdd(data.sessions ?? []);
-    await db.settings.bulkAdd(data.settings ?? []);
+  // Les sauvegardes v1 ont des identifiants numériques : on les convertit
+  const data = raw.version >= 2 ? raw : { ...raw, ...convertV1(raw) };
+  const tables = [db.categories, db.tasks, db.occStates, db.sessions, db.settings];
+  await db.transaction('rw', tables, async () => {
+    // Suppressions clé par clé (et non clear()) pour que la synchro les envoie aussi au compte
+    for (const t of tables) await t.bulkDelete(await t.toCollection().primaryKeys());
+    await db.categories.bulkPut(data.categories ?? []);
+    await db.tasks.bulkPut(data.tasks ?? []);
+    await db.occStates.bulkPut(data.occStates ?? []);
+    await db.sessions.bulkPut(data.sessions ?? []);
+    await db.settings.put({ ...DEFAULT_SETTINGS, ...(data.settings?.[0] ?? {}), id: 'main' });
   });
 }

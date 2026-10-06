@@ -59,13 +59,13 @@ export function StatsView() {
   const top = Math.ceil(maxDay / stepH) * stepH;
 
   // Par catégorie
-  const perCat = new Map<number, number>();
-  cur.forEach((s) => perCat.set(s.categoryId ?? -1, (perCat.get(s.categoryId ?? -1) ?? 0) + s.workMinutes));
+  const perCat = new Map<string, number>();
+  cur.forEach((s) => perCat.set(s.categoryId ?? '', (perCat.get(s.categoryId ?? '') ?? 0) + s.workMinutes));
   const catRows = [...perCat.entries()].sort((a, b) => b[1] - a[1]);
   const maxCat = Math.max(1, ...catRows.map((r) => r[1]));
 
   // Temps par sujet (titre de la tâche)
-  const perTitle = new Map<string, { minutes: number; categoryId: number | null }>();
+  const perTitle = new Map<string, { minutes: number; categoryId: string | null }>();
   cur.forEach((s) => {
     const e = perTitle.get(s.title) ?? { minutes: 0, categoryId: s.categoryId };
     e.minutes += s.workMinutes;
@@ -161,7 +161,7 @@ export function StatsView() {
           <section className="card">
             <h2 className="section-title">Par sujet</h2>
             {topics.map(([title, t]) => (
-              <div key={title} className="hbar topic" style={{ ['--c' as string]: cats.get(t.categoryId ?? -1)?.color ?? 'var(--muted)' }}>
+              <div key={title} className="hbar topic" style={{ ['--c' as string]: cats.get(t.categoryId ?? '')?.color ?? 'var(--muted)' }}>
                 <span className="hbar-label" title={title}><i className="dot" />{title}</span>
                 <span className="hbar-track"><span style={{ width: `${(t.minutes / maxTopic) * 100}%` }} /></span>
                 <span className="hbar-val">{fmtDuration(t.minutes)}</span>
@@ -175,7 +175,7 @@ export function StatsView() {
             <h2 className="section-title">Séances</h2>
             <ul className="session-list">
               {[...cur].sort((a, b) => b.endedAt - a.endedAt).slice(0, 15).map((s) => (
-                <li key={s.id} style={{ ['--c' as string]: cats.get(s.categoryId ?? -1)?.color ?? 'var(--muted)' }}>
+                <li key={s.id} style={{ ['--c' as string]: cats.get(s.categoryId ?? '')?.color ?? 'var(--muted)' }}>
                   <i className="dot" />
                   <span className="sl-title">{s.title}<span className="muted small">{relativeDay(s.date)}</span></span>
                   <span className="sl-val">{fmtDuration(s.workMinutes)}</span>

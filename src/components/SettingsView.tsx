@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { db, deleteCategory, PALETTE, useSettings, type Settings } from '../db';
+import { db, deleteCategory, PALETTE, resetLocalDB, uid, useSettings, type Settings } from '../db';
 import { exportData, importData } from '../lib/backup';
+import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
 import { Icon, useUI } from '../ui';
 
 function Stepper({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
@@ -26,6 +27,7 @@ const PRESETS = [
 export function SettingsView() {
   const s = useSettings();
   const ui = useUI();
+  // Ordre stable ici (pas de tri par nom) pour que la ligne ne bouge pas pendant qu'on la renomme
   const cats = useLiveQuery(() => db.categories.toArray(), []) ?? [];
   const fileRef = useRef<HTMLInputElement>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
@@ -33,6 +35,33 @@ export function SettingsView() {
   useEffect(() => {
     navigator.storage?.persisted?.().then(setPersisted).catch(() => {});
   }, []);
+
+  const sync = useSync();
+
+  const signOut = async () => {
+    await syncNow();
+    const left = sync.pending;
+    const ok = await ui.ask({
+      title: 'Se déconnecter ?',
+      message: left
+        ? `${left} modification(s) n’ont pas encore pu être envoyées et seront perdues. Les données de cet appareil seront effacées.`
+        : 'Tes données restent dans ton compte. Elles seront effacées de cet appareil et reviendront à la prochaine connexion.',
+      confirmLabel: 'Se déconnecter',
+      danger: true,
+    });
+    if (!ok) return;
+    await signOutAndClear(resetLocalDB);
+    ui.toast('Déconnecté');
+  };
+
+  const syncLabel = () => {
+    if (sync.status === 'syncing') return 'Synchronisation…';
+    if (sync.status === 'offline') return sync.pending ? `Hors ligne · ${sync.pending} modif. en attente` : 'Hors ligne';
+    if (sync.status === 'error') return 'Erreur de synchro, nouvel essai bientôt';
+    if (!sync.lastSyncedAt) return 'Pas encore synchronisé';
+    const min = Math.round((Date.now() - sync.lastSyncedAt) / 60_000);
+    return `Synchronisé ${min < 1 ? 'à l’instant' : `il y a ${min} min`}${sync.pending ? ` · ${sync.pending} en attente` : ''}`;
+  };
 
   const update = (patch: Partial<Settings>) => db.settings.put({ ...s, ...patch });
 
@@ -49,7 +78,7 @@ export function SettingsView() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const removeCat = async (id: number, name: string) => {
+  const removeCat = async (id: string, name: string) => {
     const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
     if (!ok) return;
     await deleteCategory(id);
@@ -61,6 +90,32 @@ export function SettingsView() {
     <div className="screen settings">
       <header className="page-head"><h1>Réglages</h1></header>
       <div className="scroll-body">
+        {cloudEnabled && (
+          <section className="card account">
+            <h2 className="section-title">Compte</h2>
+            {sync.session ? (
+              <>
+                <div className="account-row">
+                  <div className="avatar">{(sync.session.user.email ?? '?').charAt(0).toUpperCase()}</div>
+                  <div className="account-text">
+                    <strong>{sync.session.user.email}</strong>
+                    <span className={`sync-state ${sync.status}`}><i />{syncLabel()}</span>
+                  </div>
+                </div>
+                <div className="row2">
+                  <button className="btn secondary" onClick={() => void syncNow()} disabled={sync.status === 'syncing'}>Synchroniser</button>
+                  <button className="btn danger-ghost" onClick={signOut}>Se déconnecter</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="muted small">Tu n’es pas connecté : tes données restent uniquement sur cet appareil. Crée un compte pour les sauvegarder et les retrouver sur ton téléphone et ton PC.</p>
+                <button className="btn primary" onClick={ui.openAuth}>Se connecter / créer un compte</button>
+              </>
+            )}
+          </section>
+        )}
+
         <section className="card">
           <h2 className="section-title">Méthode de travail</h2>
           <div className="presets">
@@ -107,14 +162,14 @@ export function SettingsView() {
               </li>
             ))}
           </ul>
-          <button className="btn secondary" onClick={() => db.categories.add({ name: 'Nouvelle catégorie', color: PALETTE[cats.length % PALETTE.length] })}>
+          <button className="btn secondary" onClick={() => db.categories.add({ id: uid(), name: 'Nouvelle catégorie', color: PALETTE[cats.length % PALETTE.length] })}>
             <Icon name="plus" size={18} /> Ajouter une catégorie
           </button>
         </section>
 
         <section className="card">
           <h2 className="section-title">Données</h2>
-          <p className="muted small">Tout est stocké uniquement sur cet appareil, rien n’est envoyé en ligne. Ton téléphone et ton PC ont donc chacun leurs propres données. Exporte une sauvegarde de temps en temps.</p>
+          <p className="muted small">{sync.session ? 'Tes données sont enregistrées sur cet appareil et sauvegardées dans ton compte. Tu peux aussi exporter un fichier de sauvegarde.' : 'Sans compte, tout est stocké uniquement sur cet appareil. Exporte une sauvegarde de temps en temps.'}</p>
           {persisted === false && (
             <button className="btn ghost" onClick={async () => setPersisted((await navigator.storage?.persist?.()) ?? false)}>Protéger le stockage contre l’effacement automatique</button>
           )}

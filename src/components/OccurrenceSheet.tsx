@@ -6,7 +6,7 @@ import { Icon, Sheet, useUI } from '../ui';
 
 export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: () => void }) {
   const ui = useUI();
-  const cat = useCategories().get(occ.task.categoryId ?? -1);
+  const cat = useCategories().get(occ.task.categoryId ?? '');
   const { task } = occ;
   const isRev = task.type === 'revision';
   const recurring = task.recurrence.kind !== 'none';

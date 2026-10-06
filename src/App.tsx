@@ -8,6 +8,8 @@ import { SettingsView } from './components/SettingsView';
 import { StatsView } from './components/Stats';
 import { TaskEditor } from './components/TaskEditor';
 import { TasksView } from './components/Tasks';
+import { AuthScreen } from './components/AuthScreen';
+import { cloudEnabled, useSync } from './lib/sync';
 import { ConfirmDialog, Icon, UIContext, type AskOptions, type ReviewCtx, type UI } from './ui';
 
 type Tab = 'calendar' | 'tasks' | 'stats' | 'settings';
@@ -29,6 +31,9 @@ export default function App() {
   const [asking, setAsking] = useState<AskOptions | null>(null);
   const resolver = useRef<((value: string | null) => void) | null>(null);
   const [, bump] = useState(0);
+  const sync = useSync();
+  const [skipAuth, setSkipAuth] = useState(() => localStorage.getItem('cadence.skipAuth') === '1');
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -76,7 +81,24 @@ export default function App() {
     toast: (msg) => setToast({ msg, n: Date.now() }),
     ask,
     choose,
+    openAuth: () => setAuthOpen(true),
   }), [startReview, ask, choose]);
+
+  if (cloudEnabled && !sync.ready) return <div className="app splash" />;
+  if (sync.recovery) {
+    return <UIContext.Provider value={ui}><AuthScreen initialMode="newpass" onDone={() => ui.toast('Mot de passe modifié')} /></UIContext.Provider>;
+  }
+  if (cloudEnabled && !sync.session && (!skipAuth || authOpen)) {
+    return (
+      <UIContext.Provider value={ui}>
+        <AuthScreen
+          onSkip={() => { localStorage.setItem('cadence.skipAuth', '1'); setSkipAuth(true); setAuthOpen(false); }}
+          onDone={() => { setAuthOpen(false); ui.toast('Connecté ✓ Tes données sont synchronisées'); }}
+        />
+        {toast && <div className="toast" key={toast.n}>{toast.msg}</div>}
+      </UIContext.Provider>
+    );
+  }
 
   return (
     <UIContext.Provider value={ui}>
