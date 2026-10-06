@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { db, PALETTE, useSettings, type Settings } from '../db';
+import { db, deleteCategory, PALETTE, useSettings, type Settings } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { Icon, useUI } from '../ui';
 
@@ -52,10 +52,7 @@ export function SettingsView() {
   const removeCat = async (id: number, name: string) => {
     const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
     if (!ok) return;
-    await db.transaction('rw', db.categories, db.tasks, async () => {
-      await db.categories.delete(id);
-      await db.tasks.where('categoryId').equals(id).modify({ categoryId: null });
-    });
+    await deleteCategory(id);
   };
 
   const activePreset = PRESETS.find((p) => p.workMin === s.workMin && p.shortBreakMin === s.shortBreakMin && p.longBreakMin === s.longBreakMin && p.blocksBeforeLong === s.blocksBeforeLong);

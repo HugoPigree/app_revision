@@ -189,6 +189,11 @@ p { margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 7px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; font-weight: 550; }
 .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip.removable { padding: 0; gap: 0; }
+.chip-main { display: inline-flex; align-items: center; gap: 6px; padding: 8px 4px 8px 12px; }
+.chip-x { display: grid; place-items: center; width: 30px; height: 34px; color: var(--muted); border-radius: 0 999px 999px 0; }
+.chip.on .chip-x { color: color-mix(in srgb, var(--bg) 70%, transparent); }
+.chip-x:hover { color: var(--danger); }
 .chip.ghost { color: var(--muted); border-style: dashed; }
 .chip-input { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; color: var(--muted); }
 .chip-input input { width: 64px; border: 0; background: transparent; outline: none; color: var(--ink); padding: 6px 0; }

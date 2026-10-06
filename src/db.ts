@@ -125,6 +125,14 @@ export async function setOccStatus(taskId: number, date: string, status: OccStat
   else await db.occStates.put({ key, taskId, date, status });
 }
 
+/** Supprime une catégorie ; ses tâches restent, sans catégorie. */
+export async function deleteCategory(id: number) {
+  await db.transaction('rw', db.categories, db.tasks, async () => {
+    await db.categories.delete(id);
+    await db.tasks.where('categoryId').equals(id).modify({ categoryId: null });
+  });
+}
+
 export async function deleteTask(taskId: number) {
   await db.transaction('rw', db.tasks, db.occStates, async () => {
     await db.tasks.delete(taskId);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, deleteTask, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
+import { db, deleteCategory, deleteTask, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -65,6 +65,14 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     onClose();
   };
 
+  const removeCategory = async (id: number, name: string) => {
+    const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
+    if (!ok) return;
+    await deleteCategory(id);
+    if (t.categoryId === id) set({ categoryId: null });
+    ui.toast('Catégorie supprimée');
+  };
+
   const addCategory = async () => {
     const name = newCat?.trim();
     if (!name) return setNewCat(null);
@@ -101,14 +109,14 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
         <div className="chips">
           <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
           {cats.map((c) => (
-            <button
-              key={c.id}
-              className={`chip ${t.categoryId === c.id ? 'on' : ''}`}
-              style={{ ['--c' as string]: c.color }}
-              onClick={() => set({ categoryId: c.id! })}
-            >
-              <i className="dot" /> {c.name}
-            </button>
+            <span key={c.id} className={`chip removable ${t.categoryId === c.id ? 'on' : ''}`} style={{ ['--c' as string]: c.color }}>
+              <button className="chip-main" onClick={() => set({ categoryId: c.id! })}>
+                <i className="dot" /> {c.name}
+              </button>
+              <button className="chip-x" onClick={() => removeCategory(c.id!, c.name)} aria-label={`Supprimer la catégorie ${c.name}`}>
+                <Icon name="close" size={13} />
+              </button>
+            </span>
           ))}
           {newCat === null ? (
             <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> Catégorie</button>
