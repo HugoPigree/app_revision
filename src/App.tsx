@@ -93,7 +93,7 @@ export default function App() {
       <UIContext.Provider value={ui}>
         <AuthScreen
           onSkip={() => { localStorage.setItem('cadence.skipAuth', '1'); setSkipAuth(true); setAuthOpen(false); }}
-          onDone={() => { setAuthOpen(false); ui.toast('Connecté ✓ Tes données sont synchronisées'); }}
+          onDone={() => { setAuthOpen(false); setTab('calendar'); ui.toast('Connecté ✓ Tes données sont synchronisées'); }}
         />
         {toast && <div className="toast" key={toast.n}>{toast.msg}</div>}
       </UIContext.Provider>

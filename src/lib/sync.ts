@@ -204,6 +204,8 @@ export async function signOutAndClear(resetLocal: () => Promise<void>) {
   pending.clear();
   savePending();
   localStorage.removeItem('cadence.lastSyncedAt');
+  // La base locale est vidée : à la prochaine connexion il faudra tout re-télécharger
+  for (const k of Object.keys(localStorage)) if (k.startsWith('cadence.lastPull.')) localStorage.removeItem(k);
   await resetLocal();
   setState({ lastSyncedAt: null, status: 'signed-out', session: null });
 }
