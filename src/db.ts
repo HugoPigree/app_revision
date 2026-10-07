@@ -1,15 +1,33 @@
 import Dexie, { type Table, type Transaction } from 'dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 
-export type TaskType = 'revision' | 'project' | 'activity';
+/** Identifiant d'un type de tâche (« grande catégorie ») : révision, projet, activité ou type créé par l'utilisateur */
+export type TaskType = string;
 
-export const TASK_TYPES: TaskType[] = ['revision', 'project', 'activity'];
-/** Libellés : [singulier, pluriel, catégorie au singulier, nouvelle catégorie] */
-export const TYPE_LABEL: Record<TaskType, { one: string; many: string; cat: string; newCat: string }> = {
-  revision: { one: 'Révision', many: 'Révisions', cat: 'Matière', newCat: 'Nouvelle matière' },
-  project: { one: 'Projet', many: 'Projets', cat: 'Cours / module', newCat: 'Nouveau cours' },
-  activity: { one: 'Activité', many: 'Activités', cat: 'Catégorie', newCat: 'Nouvelle activité' },
-};
+export interface TypeDef {
+  id: string;
+  name: string;
+  /** true : se lance en mode Pomodoro et compte dans le bilan ; false : se coche simplement */
+  pomodoro: boolean;
+  order: number;
+}
+
+/** Types par défaut : ids fixes pour qu'ils soient les mêmes sur tous les appareils */
+export const DEFAULT_TYPES: TypeDef[] = [
+  { id: 'revision', name: 'Révision', pomodoro: true, order: 0 },
+  { id: 'project', name: 'Projet', pomodoro: false, order: 1 },
+  { id: 'activity', name: 'Activité', pomodoro: false, order: 2 },
+];
+
+export function useTypes(): TypeDef[] {
+  const list = useLiveQuery(() => db.types.toArray(), []);
+  return (list ?? DEFAULT_TYPES).slice().sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+}
+
+/** Type d'une tâche ou d'une catégorie ; si le type a été supprimé ailleurs, on retombe sur le premier */
+export function typeOf(id: string | undefined, types: TypeDef[]): TypeDef {
+  return types.find((t) => t.id === id) ?? types[0] ?? DEFAULT_TYPES[0];
+}
 
 /** days : 0 = lundi … 6 = dimanche */
 export type Recurrence =
@@ -112,9 +130,10 @@ export async function fixCategoryTypes(): Promise<void> {
   const untyped = (await db.categories.toArray()).filter((c) => !c.type);
   if (!untyped.length) return;
   const tasks = await db.tasks.toArray();
+  const typeIds = DEFAULT_TYPES.map((t) => t.id);
   for (const c of untyped) {
     const used = tasks.filter((t) => t.categoryId === c.id);
-    const counts = TASK_TYPES.map((ty) => [ty, used.filter((t) => t.type === ty).length] as const).sort((a, b) => b[1] - a[1]);
+    const counts = typeIds.map((ty) => [ty, used.filter((t) => t.type === ty).length] as const).sort((a, b) => b[1] - a[1]);
     const type: TaskType = used.length && counts[0][1] > counts[1][1] ? counts[0][0] : catType(c);
     await db.categories.update(c.id, { type });
   }
@@ -132,6 +151,7 @@ export const SYNCED = {
   occStates: 'key',
   sessions: 'id',
   settings: 'id',
+  types: 'id',
 } as const;
 export type SyncedTable = keyof typeof SYNCED;
 
@@ -143,6 +163,7 @@ class CadenceDB extends Dexie {
   occStates!: Table<OccState, string>;
   sessions!: Table<Session, string>;
   settings!: Table<Settings, string>;
+  types!: Table<TypeDef, string>;
   meta!: Table<Meta, string>;
 
   constructor() {
@@ -155,6 +176,7 @@ class CadenceDB extends Dexie {
       settings: 'id',
       meta: 'key',
     });
+    this.version(2).stores({ types: 'id, order' });
   }
 }
 
@@ -195,20 +217,24 @@ export async function initDB(): Promise<void> {
   const migrated = await migrateFromV1();
   if (!migrated) {
     // Nouvelle installation : catégories par défaut, non suivies (identiques sur chaque appareil)
-    await db.transaction('rw', db.categories, db.settings, async (tx) => {
+    await db.transaction('rw', db.categories, db.settings, db.types, async (tx) => {
       markRemote(tx);
+      await db.types.bulkPut(DEFAULT_TYPES);
       await db.categories.bulkPut(DEFAULT_CATEGORIES);
       if (!(await db.settings.get('main'))) await db.settings.put(DEFAULT_SETTINGS);
     });
+    await db.meta.put({ key: 'typesSeeded', value: Date.now() });
   }
   await db.meta.put({ key: 'initialized', value: Date.now() });
 }
 
 /** Réinitialise la base locale (déconnexion) */
 export async function resetLocalDB(): Promise<void> {
-  await db.transaction('rw', [db.categories, db.tasks, db.occStates, db.sessions, db.settings, db.meta], async (tx) => {
+  await db.transaction('rw', [db.categories, db.tasks, db.occStates, db.sessions, db.settings, db.types, db.meta], async (tx) => {
     markRemote(tx);
-    await Promise.all([db.categories.clear(), db.tasks.clear(), db.occStates.clear(), db.sessions.clear(), db.settings.clear()]);
+    await Promise.all([db.categories.clear(), db.tasks.clear(), db.occStates.clear(), db.sessions.clear(), db.settings.clear(), db.types.clear()]);
+    await db.types.bulkPut(DEFAULT_TYPES);
+    await db.meta.put({ key: 'typesSeeded', value: Date.now() });
     await db.categories.bulkPut(DEFAULT_CATEGORIES);
     await db.settings.put(DEFAULT_SETTINGS);
     await db.meta.put({ key: 'initialized', value: Date.now() });
@@ -217,7 +243,42 @@ export async function resetLocalDB(): Promise<void> {
 
 /** À lancer à chaque démarrage : corrections de données sans effet si déjà faites */
 export async function repairDB(): Promise<void> {
+  // Installations d'avant les types modifiables : on ajoute les 3 types par défaut (une seule fois)
+  if (!(await db.meta.get('typesSeeded'))) {
+    await db.transaction('rw', db.types, db.meta, async (tx) => {
+      markRemote(tx);
+      for (const t of DEFAULT_TYPES) if (!(await db.types.get(t.id))) await db.types.put(t);
+      await db.meta.put({ key: 'typesSeeded', value: Date.now() });
+    });
+  }
   await fixCategoryTypes();
+}
+
+/** Supprime un type : ses catégories et ses tâches passent dans un autre type. Renvoie une fonction d'annulation. */
+export async function deleteType(id: string, moveTo: string): Promise<{ moved: number; undo: () => Promise<void> }> {
+  let saved: TypeDef | undefined;
+  let taskIds: string[] = [];
+  let catIds: string[] = [];
+  await db.transaction('rw', db.types, db.tasks, db.categories, async () => {
+    saved = await db.types.get(id);
+    taskIds = (await db.tasks.where('type').equals(id).primaryKeys()) as string[];
+    catIds = (await db.categories.filter((c) => c.type === id).primaryKeys()) as string[];
+    await db.types.delete(id);
+    await db.tasks.where('id').anyOf(taskIds).modify({ type: moveTo });
+    await db.categories.where('id').anyOf(catIds).modify({ type: moveTo });
+  });
+  return {
+    moved: taskIds.length,
+    undo: async () => {
+      if (!saved) return;
+      const t = saved;
+      await db.transaction('rw', db.types, db.tasks, db.categories, async () => {
+        await db.types.put(t);
+        await db.tasks.where('id').anyOf(taskIds).modify({ type: t.id });
+        await db.categories.where('id').anyOf(catIds).modify({ type: t.id });
+      });
+    },
+  };
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

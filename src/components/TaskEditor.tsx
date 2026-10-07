@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { catType, db, deleteCategory, deleteTask, TASK_TYPES, TYPE_LABEL, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
+import { catType, db, deleteCategory, deleteTask, typeOf, uid, PALETTE, useCategories, useTypes, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -25,9 +25,11 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const [t, setT] = useState<Task>(base);
   const [newCat, setNewCat] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const types = useTypes();
+  const ty = typeOf(t.type, types);
   const catName = cats.find((c) => c.id === t.categoryId)?.name;
   // Sans titre, la tâche prend le nom de sa catégorie
-  const fallbackTitle = catName ?? TYPE_LABEL[t.type].one;
+  const fallbackTitle = catName ?? ty.name;
   const set = (patch: Partial<Task>) => setT((p) => ({ ...p, ...patch }));
   const rec = t.recurrence;
 
@@ -47,7 +49,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     if (rec.kind === 'weekly' && rec.days.length === 0) return setError('Choisis au moins un jour.');
     if (t.endDate && t.endDate < t.startDate) return setError('La date de fin est avant la date de début.');
     if (!t.durationMin || t.durationMin < 5) return setError('Durée minimale : 5 minutes.');
-    await db.tasks.put({ ...t, title: t.title.trim() || fallbackTitle });
+    await db.tasks.put({ ...t, type: ty.id, title: t.title.trim() || fallbackTitle });
     ui.toast(task ? 'Tâche modifiée' : 'Tâche ajoutée');
     onClose();
   };
@@ -67,10 +69,10 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   };
 
   // Seules les catégories du type choisi (révision / activité) sont proposées
-  const shownCats = cats.filter((c) => catType(c) === t.type || c.id === t.categoryId);
+  const shownCats = cats.filter((c) => typeOf(catType(c), types).id === ty.id || c.id === t.categoryId);
   const switchType = (ty: TaskType) => {
     const cur = cats.find((c) => c.id === t.categoryId);
-    set({ type: ty, ...(cur && catType(cur) !== ty ? { categoryId: null } : {}) });
+    set({ type: ty, ...(cur && typeOf(catType(cur), types).id !== ty ? { categoryId: null } : {}) });
   };
 
   const removeCategory = async (id: string, name: string) => {
@@ -83,7 +85,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const addCategory = async () => {
     const name = newCat?.trim();
     if (!name) return setNewCat(null);
-    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length], type: t.type });
+    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length], type: ty.id });
     set({ categoryId: id });
     setNewCat(null);
   };
@@ -99,22 +101,20 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
           autoFocus={!task}
         />
 
-        <div className="seg full">
-          {TASK_TYPES.map((ty) => (
-            <button key={ty} className={t.type === ty ? 'on' : ''} onClick={() => switchType(ty)}>
-              {TYPE_LABEL[ty].one}
+        <div className={`seg full ${types.length > 3 ? 'scroll-x' : ''}`}>
+          {types.map((o) => (
+            <button key={o.id} className={ty.id === o.id ? 'on' : ''} onClick={() => switchType(o.id)}>
+              {o.name}
             </button>
           ))}
         </div>
         <p className="hint">
-          {t.type === 'revision'
-            ? 'Une révision se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.'
-            : t.type === 'project'
-              ? 'Un projet à faire pour l’école (TP, dossier, exposé…). Tu le coches quand c’est fait, sans Pomodoro.'
-              : 'Une activité se coche simplement comme faite (sport, boulot, perso…).'}
+          {ty.pomodoro
+            ? `« ${ty.name} » se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.`
+            : `« ${ty.name} » se coche simplement comme fait, sans Pomodoro.`}
         </p>
 
-        <label className="field-label">{TYPE_LABEL[t.type].cat}</label>
+        <label className="field-label">Catégorie</label>
         <div className="chips">
           <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
           {shownCats.map((c) => (
@@ -128,7 +128,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
             </span>
           ))}
           {newCat === null ? (
-            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> {TYPE_LABEL[t.type].cat}</button>
+            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> Catégorie</button>
           ) : (
             <span className="chip-input">
               <input autoFocus value={newCat} placeholder="Nom" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCategory()} />

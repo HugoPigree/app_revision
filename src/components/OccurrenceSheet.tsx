@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { TYPE_LABEL, db, deleteTask, setOccStatus, useCategories } from '../db';
+import { db, deleteTask, setOccStatus, typeOf, useCategories, useTypes } from '../db';
 import { fmtDuration, fmtLongDay, minToTime } from '../lib/dates';
 import { describeRecurrence, type Occurrence } from '../lib/recurrence';
 import { Icon, Sheet, useUI } from '../ui';
@@ -8,7 +8,8 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
   const ui = useUI();
   const cat = useCategories().get(occ.task.categoryId ?? '');
   const { task } = occ;
-  const isRev = task.type === 'revision';
+  const ty = typeOf(task.type, useTypes());
+  const isRev = ty.pomodoro;
   const recurring = task.recurrence.kind !== 'none';
   const sessions = useLiveQuery(() => db.sessions.where('taskId').equals(task.id!).toArray(), [task.id]) ?? [];
   const sessionsHere = sessions.filter((s) => s.occKey === occ.key);
@@ -40,7 +41,7 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
     <Sheet onClose={onClose}>
       <div className="occ">
         <div className="occ-tag" style={{ ['--c' as string]: cat?.color ?? 'var(--muted)' }}>
-          <i className="dot" /> {cat?.name ?? 'Sans catégorie'} · {TYPE_LABEL[task.type].one}
+          <i className="dot" /> {cat?.name ?? 'Sans catégorie'} · {ty.name}
         </div>
         <h2 className="occ-title">{task.title}</h2>
         <ul className="occ-meta">

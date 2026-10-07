@@ -1,13 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { db, useCategories, type Task } from '../db';
+import { db, typeOf, useCategories, useTypes, type Task } from '../db';
 import { fmtDuration, relativeDay, todayKey } from '../lib/dates';
 import { describeRecurrence, nextOccurrence } from '../lib/recurrence';
 import { Icon, useUI } from '../ui';
 
-type Filter = 'all' | 'revision' | 'project' | 'activity';
+type Filter = string; // 'all' ou id d'un type
 
 export function TasksView() {
+  const types = useTypes();
   const ui = useUI();
   const cats = useCategories();
   const [filter, setFilter] = useState<Filter>('all');
@@ -18,7 +19,7 @@ export function TasksView() {
   }, []);
 
   if (!data) return <div className="screen" />;
-  const tasks = data.tasks.filter((t) => filter === 'all' || t.type === filter);
+  const tasks = data.tasks.filter((t) => filter === 'all' || typeOf(t.type, types).id === filter);
   const withNext = tasks.map((t) => ({ t, next: nextOccurrence(t, data.skipped) }));
   const recurring = withNext.filter(({ t, next }) => t.recurrence.kind !== 'none' && next).sort((a, b) => a.t.title.localeCompare(b.t.title));
   const upcoming = withNext.filter(({ t, next }) => t.recurrence.kind === 'none' && next).sort((a, b) => (a.next! < b.next! ? -1 : 1));
@@ -49,7 +50,7 @@ export function TasksView() {
             </span>
           </span>
         </button>
-        {t.type === 'revision' && (
+        {typeOf(t.type, types).pomodoro && (
           <button className="round-play" onClick={() => review(t, next)} aria-label={`Réviser ${t.title}`}>
             <Icon name="play" size={16} />
           </button>
@@ -64,11 +65,11 @@ export function TasksView() {
     <div className="screen tasks">
       <header className="page-head">
         <h1>Tâches</h1>
-        <div className="seg">
+        <div className="seg scroll-x">
           <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>Toutes</button>
-          <button className={filter === 'revision' ? 'on' : ''} onClick={() => setFilter('revision')}>Révisions</button>
-          <button className={filter === 'project' ? 'on' : ''} onClick={() => setFilter('project')}>Projets</button>
-          <button className={filter === 'activity' ? 'on' : ''} onClick={() => setFilter('activity')}>Activités</button>
+          {types.map((o) => (
+            <button key={o.id} className={filter === o.id ? 'on' : ''} onClick={() => setFilter(o.id)}>{o.name}</button>
+          ))}
         </div>
       </header>
       <div className="scroll-body">

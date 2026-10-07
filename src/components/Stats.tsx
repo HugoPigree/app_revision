@@ -25,9 +25,10 @@ export function StatsView() {
   const today = todayKey();
 
   const data = useLiveQuery(async () => {
+    const pomodoroTypes = (await db.types.toArray()).filter((t) => t.pomodoro).map((t) => t.id);
     const [sessions, tasks, states] = await Promise.all([
       db.sessions.where('date').between(prevFrom, to, true, true).toArray(),
-      db.tasks.where('type').equals('revision').toArray(),
+      db.tasks.where('type').anyOf(pomodoroTypes).toArray(),
       db.occStates.where('date').between(from, to, true, true).toArray(),
     ]);
     const end = to < today ? to : today;

@@ -13,6 +13,7 @@ export async function exportData(): Promise<'shared' | 'downloaded'> {
     occStates: await db.occStates.toArray(),
     sessions: await db.sessions.toArray(),
     settings: await db.settings.toArray(),
+    types: await db.types.toArray(),
   };
   const name = `cadence-sauvegarde-${todayKey()}.json`;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -43,8 +44,8 @@ export async function importData(file: File): Promise<void> {
   }
   // Les sauvegardes v1 ont des identifiants numériques : on les convertit
   const data = raw.version >= 2 ? raw : { ...raw, ...convertV1(raw) };
-  const tables = [db.categories, db.tasks, db.occStates, db.sessions, db.settings];
-  await db.transaction('rw', tables, async () => {
+  const tables = [db.categories, db.tasks, db.occStates, db.sessions, db.settings, ...(Array.isArray(data.types) ? [db.types] : [])];
+  await db.transaction('rw', [...tables, db.types], async () => {
     // Suppressions clé par clé (et non clear()) pour que la synchro les envoie aussi au compte
     for (const t of tables) await t.bulkDelete(await t.toCollection().primaryKeys());
     await db.categories.bulkPut(data.categories ?? []);
@@ -52,5 +53,6 @@ export async function importData(file: File): Promise<void> {
     await db.occStates.bulkPut(data.occStates ?? []);
     await db.sessions.bulkPut(data.sessions ?? []);
     await db.settings.put({ ...DEFAULT_SETTINGS, ...(data.settings?.[0] ?? {}), id: 'main' });
+    if (Array.isArray(data.types) && data.types.length) await db.types.bulkPut(data.types);
   });
 }

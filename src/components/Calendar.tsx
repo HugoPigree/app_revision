@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useCategories, useSettings } from '../db';
+import { useCategories, useSettings, typeOf, useTypes } from '../db';
 import { addDays, dateRange, DAY_LETTERS, DAY_SHORT, fmtLongDay, fmtMonth, fromKey, minToTime, nowMin, startOfWeek, todayKey, weekday } from '../lib/dates';
 import { useOccurrences, type Occurrence } from '../lib/recurrence';
 import { moveOccurrence } from '../lib/move';
@@ -48,6 +48,7 @@ function layout(occs: Occurrence[]): Placed[] {
 export function CalendarView() {
   const settings = useSettings();
   const cats = useCategories();
+  const types = useTypes();
   const ui = useUI();
   const [view, setView] = useState<'week' | 'day'>('week');
   const [date, setDate] = useState(todayKey());
@@ -240,7 +241,7 @@ export function CalendarView() {
                   return (
                     <button
                       key={occ.key}
-                      className={`event ${occ.status} ${view} ${occ.task.type} ${view === 'week' && !desktop && lanes > 1 ? 'narrow' : ''} ${drag?.key === occ.key ? 'drag-src' : ''}`}
+                      className={`event ${occ.status} ${view} ${occ.task.type} ${typeOf(occ.task.type, types).pomodoro ? '' : 'check'} ${view === 'week' && !desktop && lanes > 1 ? 'narrow' : ''} ${drag?.key === occ.key ? 'drag-src' : ''}`}
                       style={{
                         top, height,
                         left: `calc(${(lane / lanes) * 100}% + 1px)`,

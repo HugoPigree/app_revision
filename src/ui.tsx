@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Task } from './db';
 import type { Occurrence } from './lib/recurrence';
 
@@ -142,5 +142,46 @@ export function Icon({ name, size = 22 }: { name: string; size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={PATHS[name]} />
     </svg>
+  );
+}
+
+/**
+ * Champ texte qui garde sa propre valeur pendant la saisie et enregistre
+ * un peu après (et à la sortie du champ). Évite de perdre des lettres quand
+ * la valeur vient de la base locale (mise à jour asynchrone).
+ */
+export function LiveInput({ value, onSave, fallback, ...rest }: {
+  value: string;
+  onSave: (v: string) => void;
+  fallback?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [local, setLocal] = useState(value);
+  const focused = useRef(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => { if (!focused.current) setLocal(value); }, [value]);
+  const commit = (v: string) => {
+    clearTimeout(timer.current);
+    const out = v.trim() || fallback;
+    if (out !== undefined && out !== value) onSave(out);
+  };
+  return (
+    <input
+      {...rest}
+      value={local}
+      onFocus={(e) => { focused.current = true; rest.onFocus?.(e); }}
+      onChange={(e) => {
+        const v = e.target.value;
+        setLocal(v);
+        clearTimeout(timer.current);
+        if (v.trim()) timer.current = window.setTimeout(() => onSave(v.trim()), 400);
+      }}
+      onBlur={(e) => {
+        focused.current = false;
+        commit(local);
+        if (!local.trim() && fallback) setLocal(fallback);
+        rest.onBlur?.(e);
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); rest.onKeyDown?.(e); }}
+    />
   );
 }

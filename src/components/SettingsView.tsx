@@ -1,9 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { catType, db, deleteCategory, PALETTE, resetLocalDB, TASK_TYPES, TYPE_LABEL, uid, useSettings, type Settings, type TaskType } from '../db';
+import { catType, db, deleteCategory, deleteType, PALETTE, resetLocalDB, typeOf, uid, useSettings, useTypes, type Settings } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
-import { Icon, useUI } from '../ui';
+import { Icon, LiveInput, useUI } from '../ui';
 
 function Stepper({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
   return (
@@ -78,6 +78,31 @@ export function SettingsView() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  const types = useTypes();
+
+  const addType = async () => {
+    const order = Math.max(-1, ...types.map((t) => t.order)) + 1;
+    await db.types.add({ id: uid(), name: 'Nouvelle catégorie', pomodoro: false, order });
+    setTimeout(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('.type-name');
+      const last = inputs[inputs.length - 1];
+      last?.focus();
+      last?.select();
+    }, 50);
+  };
+
+  const removeType = async (id: string) => {
+    const ty = types.find((t) => t.id === id);
+    // Les tâches partent de préférence vers un type qui fonctionne pareil (avec ou sans Pomodoro)
+    const target = types.find((t) => t.id !== id && t.pomodoro === ty?.pomodoro) ?? types.find((t) => t.id !== id);
+    if (!ty || !target) return;
+    const { moved, undo } = await deleteType(id, target.id);
+    ui.toast(
+      moved ? `« ${ty.name} » supprimée · ${moved} tâche${moved > 1 ? 's' : ''} → ${target.name}` : `« ${ty.name} » supprimée`,
+      { label: 'Annuler', run: () => void undo() },
+    );
+  };
+
   const removeCat = async (id: string, name: string) => {
     const undo = await deleteCategory(id);
     ui.toast(`« ${name} » supprimée`, { label: 'Annuler', run: () => void undo() });
@@ -145,12 +170,29 @@ export function SettingsView() {
         </section>
 
         <section className="card cats-card">
-          <h2 className="section-title">Catégories</h2>
-          {TASK_TYPES.map((ty) => {
-            const list = cats.filter((c) => catType(c) === ty);
+          <h2 className="section-title">Types et catégories</h2>
+          <p className="muted small">Les grandes catégories regroupent tes tâches. Active le Pomodoro pour celles que tu veux chronométrer (elles comptent alors dans ton bilan).</p>
+          {types.map((ty) => {
+            const list = cats.filter((c) => typeOf(catType(c), types).id === ty.id);
             return (
-              <div key={ty} className="cat-group">
-                <h3 className="cat-group-title">{TYPE_LABEL[ty].many}</h3>
+              <div key={ty.id} className="cat-group">
+                <div className="type-head">
+                  <LiveInput
+                    className="type-name"
+                    value={ty.name}
+                    fallback="Sans nom"
+                    onSave={(name) => void db.types.update(ty.id, { name })}
+                    aria-label="Nom de la grande catégorie"
+                  />
+                  <label className="switch" title="Mode Pomodoro">
+                    <input type="checkbox" checked={ty.pomodoro} onChange={(e) => db.types.update(ty.id, { pomodoro: e.target.checked })} />
+                    <span className="switch-track"><span /></span>
+                    <span className="switch-label">Pomodoro</span>
+                  </label>
+                  {types.length > 1 && (
+                    <button className="icon-btn" onClick={() => removeType(ty.id)} aria-label={`Supprimer la grande catégorie ${ty.name}`}><Icon name="trash" size={18} /></button>
+                  )}
+                </div>
                 <ul className="cat-list">
                   {list.map((c) => (
                     <li key={c.id}>
@@ -162,29 +204,34 @@ export function SettingsView() {
                           aria-label={`Couleur de ${c.name}`}
                         />
                       </div>
-                      <input className="cat-name" value={c.name} onChange={(e) => db.categories.update(c.id, { name: e.target.value })} />
-                      <select
-                        className="cat-move"
-                        value={ty}
-                        onChange={(e) => db.categories.update(c.id, { type: e.target.value as TaskType })}
-                        aria-label={`Type de ${c.name}`}
-                      >
-                        {TASK_TYPES.map((o) => <option key={o} value={o}>{TYPE_LABEL[o].many}</option>)}
-                      </select>
+                      <LiveInput className="cat-name" value={c.name} fallback="Sans nom" onSave={(name) => void db.categories.update(c.id, { name })} aria-label="Nom de la catégorie" />
+                      {types.length > 1 && (
+                        <select
+                          className="cat-move"
+                          value={ty.id}
+                          onChange={(e) => db.categories.update(c.id, { type: e.target.value })}
+                          aria-label={`Type de ${c.name}`}
+                        >
+                          {types.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                        </select>
+                      )}
                       <button className="icon-btn" onClick={() => removeCat(c.id, c.name)} aria-label={`Supprimer ${c.name}`}><Icon name="trash" size={18} /></button>
                     </li>
                   ))}
-                  {!list.length && <li className="muted small">Aucune pour l’instant.</li>}
+                  {!list.length && <li className="muted small">Aucune catégorie pour l’instant.</li>}
                 </ul>
                 <button
                   className="btn ghost add-cat"
-                  onClick={() => db.categories.add({ id: uid(), name: TYPE_LABEL[ty].newCat, color: PALETTE[cats.length % PALETTE.length], type: ty })}
+                  onClick={() => db.categories.add({ id: uid(), name: 'Nouvelle catégorie', color: PALETTE[cats.length % PALETTE.length], type: ty.id })}
                 >
-                  <Icon name="plus" size={16} /> Ajouter {ty === 'revision' ? 'une matière' : ty === 'project' ? 'un cours' : 'une catégorie'}
+                  <Icon name="plus" size={16} /> Ajouter une catégorie
                 </button>
               </div>
             );
           })}
+          <button className="btn secondary" onClick={addType}>
+            <Icon name="plus" size={18} /> Ajouter une grande catégorie
+          </button>
         </section>
 
         <section className="card">
