@@ -1,11 +1,87 @@
 import { useState } from 'react';
 import { catType, db, deleteCategory, deleteTask, typeOf, uid, useCategories, useTypes, type Recurrence, type Task, type TaskType } from '../db';
-import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
+import { DAY_LETTERS, fmtDuration, minToTime, timeToMin, todayKey, weekday } from '../lib/dates';
 import { pickDistinctColor } from '../lib/colors';
 import { createType, removeTypeWithUndo } from '../lib/types';
 import { Icon, Sheet, useUI } from '../ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
+const STEP = 5;
+const MIN_DUR = 5;
+const MAX_DUR = 12 * 60;
+
+/** Durée : grande valeur avec − / +, saisie libre en touchant la valeur, raccourcis en dessous */
+function DurationPicker({ value, start, onChange }: { value: number; start: string; onChange: (min: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [h, setH] = useState('');
+  const [m, setM] = useState('');
+  const clamp = (v: number) => Math.min(MAX_DUR, Math.max(MIN_DUR, Math.round(v)));
+  const end = minToTime((timeToMin(start) + value) % (24 * 60));
+
+  const openEdit = () => {
+    setH(String(Math.floor(value / 60)));
+    setM(String(value % 60));
+    setEditing(true);
+  };
+  const commit = () => {
+    const total = (Number(h) || 0) * 60 + (Number(m) || 0);
+    if (total > 0) onChange(clamp(total));
+    setEditing(false);
+  };
+
+  return (
+    <div className="duration">
+      <div className="duration-head">
+        <span className="field-label">Durée</span>
+        <span className="duration-end">Fin à {end}</span>
+      </div>
+      <div className="duration-main">
+        <button className="dur-step" onClick={() => onChange(clamp(value - STEP))} disabled={value <= MIN_DUR} aria-label={`Moins ${STEP} minutes`}>−</button>
+        {editing ? (
+          <div className="dur-edit" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) commit(); }}>
+            <input
+              autoFocus
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={12}
+              value={h}
+              onChange={(e) => setH(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && commit()}
+              aria-label="Heures"
+            />
+            <span>h</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={59}
+              value={m}
+              onChange={(e) => setM(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && commit()}
+              aria-label="Minutes"
+            />
+            <span>min</span>
+            <button className="dur-ok" onClick={commit}>OK</button>
+          </div>
+        ) : (
+          <button className="dur-value" onClick={openEdit} aria-label={`Durée ${fmtDuration(value)}, toucher pour saisir`}>
+            <b>{fmtDuration(value)}</b>
+            <span>toucher pour saisir</span>
+          </button>
+        )}
+        <button className="dur-step" onClick={() => onChange(clamp(value + STEP))} disabled={value >= MAX_DUR} aria-label={`Plus ${STEP} minutes`}>+</button>
+      </div>
+      <div className="chips dur-presets">
+        {DURATIONS.map((d) => (
+          <button key={d} className={`chip ${value === d ? 'on' : ''}`} onClick={() => { setEditing(false); onChange(d); }}>
+            {fmtDuration(d)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?: Partial<Task>; onClose: () => void }) {
   const ui = useUI();
@@ -240,18 +316,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
               <input type="time" value={t.startTime} onChange={(e) => e.target.value && set({ startTime: e.target.value })} />
             </div>
           </div>
-          <label className="field-label">Durée</label>
-          <div className="chips">
-            {DURATIONS.map((d) => (
-              <button key={d} className={`chip ${t.durationMin === d ? 'on' : ''}`} onClick={() => set({ durationMin: d })}>
-                {fmtDuration(d)}
-              </button>
-            ))}
-            <span className="chip-input">
-              <input type="number" inputMode="numeric" min={5} max={720} value={t.durationMin} onChange={(e) => set({ durationMin: Number(e.target.value) })} aria-label="Durée en minutes" />
-              <span>min</span>
-            </span>
-          </div>
+          <DurationPicker value={t.durationMin} start={t.startTime} onChange={(d) => set({ durationMin: d })} />
         </section>
 
         <section className="group">
