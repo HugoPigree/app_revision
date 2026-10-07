@@ -78,4 +78,5 @@ Web Push (iPhone : iOS 16.4+, app ajoutée à l'écran d'accueil). À activer da
 
 - Rappel avant chaque tâche (délai réglable), fin de pomodoro / de pause, récap du matin, tâches pas cochées le soir.
 - Côté serveur (Supabase) : la fonction `supabase/functions/notify-tick` est appelée chaque minute par `pg_cron`. Elle lit les tâches synchronisées, calcule les notifs à envoyer (`logic.ts`) et les envoie en Web Push chiffré (`webpush.ts`, WebCrypto, sans dépendance).
+- Fin de tâche : la notif « c'est fait ? » porte les boutons **✓ Fait** (le service worker appelle `supabase/functions/notify-action` avec un jeton signé propre à la tâche, sans ouvrir l'app) et **Décaler** (ouvre l'app sur le choix du créneau). Les boutons marchent sur Android et ordinateur ; l'iPhone ne les affiche pas, toucher la notif ouvre alors l'app sur la question.
 - Tables : `cadence_push_subscriptions` (un abonnement par appareil), `cadence_scheduled_pushes` (fins de pomodoro programmées par l'app), `cadence_sent_notifications` (anti-doublons), `cadence_config` (clés VAPID et secret, lisibles uniquement par le serveur).

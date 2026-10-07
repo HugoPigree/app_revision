@@ -3,6 +3,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { computeNotifications, type NotifSettings, type OccState, type Task } from './logic.ts';
 import { sendPush, type PushSubscription, type Vapid } from './webpush.ts';
+import { actionToken } from './actiontoken.ts';
+
+const ACTION_URL = `${Deno.env.get('SUPABASE_URL')}/functions/v1/notify-action`;
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
   auth: { persistSession: false },
@@ -91,7 +94,13 @@ Deno.serve(async (req) => {
         // On note d'abord l'envoi : si deux appels se chevauchent, un seul gagne
         const { error: insErr } = await supabase.from('cadence_sent_notifications').insert({ user_id: userId, key: n.key });
         if (insErr) continue;
-        await sendToUser(subs, { title: n.title, body: n.body, tag: n.tag, url: n.url ?? '/' }, vapid, stats);
+        const msg: Record<string, unknown> = { title: n.title, body: n.body, tag: n.tag, url: n.url ?? '/' };
+        if (n.occKey) {
+          // Fin de tâche : boutons « ✓ Fait » (coche sans ouvrir l'app) et « Décaler » (ouvre l'app)
+          msg.actions = [{ action: 'done', title: '✓ Fait' }, { action: 'postpone', title: 'Décaler' }];
+          msg.act = { api: ACTION_URL, u: userId, k: n.occKey, t: await actionToken(cfg.cron_secret, userId, n.occKey) };
+        }
+        await sendToUser(subs, msg, vapid, stats);
       }
     }
 

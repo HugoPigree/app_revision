@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, setOccStatus, useCategories } from '../db';
 import { addDays, fmtDuration, minToTime, nowMin, relativeDay, todayKey } from '../lib/dates';
 import { expand, type Occurrence } from '../lib/recurrence';
 import { postponeOccurrence } from '../lib/move';
+import { syncNow } from '../lib/sync';
 import { loadRun } from './Review';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -74,21 +75,27 @@ export function PostponePicker({ occ, onDone, onBack }: { occ: Occurrence; onDon
 
 /* ——— Fenêtre « c'est fait ? » à la fin d'une tâche ——— */
 
-/** Clé d'occurrence demandée depuis une notification (?fin=…) */
-function readFocusFromUrl(): string | null {
-  const p = new URLSearchParams(location.search);
-  const k = p.get('fin');
-  if (k) history.replaceState(null, '', location.pathname);
-  return k;
+/** Tâche demandée depuis une notification (?fin=…, &decaler=1 pour le bouton « Décaler ») */
+function parseFocus(search: string): { key: string; postpone: boolean } | null {
+  const p = new URLSearchParams(search);
+  const key = p.get('fin');
+  return key ? { key, postpone: p.get('decaler') === '1' } : null;
 }
+function readFocusFromUrl() {
+  const f = parseFocus(location.search);
+  if (f) history.replaceState(null, '', location.pathname);
+  return f;
+}
+const initialFocus = readFocusFromUrl();
 
 export function EndCheck({ paused }: { paused: boolean }) {
   const ui = useUI();
   const cats = useCategories();
   const [tick, setTick] = useState(0);
-  const [focus, setFocus] = useState<string | null>(readFocusFromUrl);
+  const [focus, setFocus] = useState<string | null>(initialFocus?.key ?? null);
   const [later, setLater] = useState<Set<string>>(() => new Set()); // « plus tard » : jusqu'à la prochaine ouverture
-  const [mode, setMode] = useState<'ask' | 'postpone'>('ask');
+  const [mode, setMode] = useState<'ask' | 'postpone'>(initialFocus?.postpone ? 'postpone' : 'ask');
+  const wantPostpone = useRef(initialFocus?.postpone ?? false);
 
   // Vérifie régulièrement, et à chaque retour sur l'app
   useEffect(() => {
@@ -98,9 +105,15 @@ export function EndCheck({ paused }: { paused: boolean }) {
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('focus', again);
     const onMsg = (e: MessageEvent) => {
-      const url = (e.data as { type?: string; url?: string } | null)?.type === 'open' ? e.data.url as string : null;
-      const k = url ? new URL(url, location.origin).searchParams.get('fin') : null;
-      if (k) { setFocus(k); setMode('ask'); again(); }
+      const msg = e.data as { type?: string; url?: string } | null;
+      if (msg?.type === 'refresh') { void syncNow(); return; } // tâche cochée depuis la notif
+      const f = msg?.type === 'open' && msg.url ? parseFocus(new URL(msg.url, location.origin).search) : null;
+      if (f) {
+        wantPostpone.current = f.postpone;
+        setFocus(f.key);
+        setMode(f.postpone ? 'postpone' : 'ask');
+        again();
+      }
     };
     navigator.serviceWorker?.addEventListener('message', onMsg);
     return () => {
@@ -142,7 +155,13 @@ export function EndCheck({ paused }: { paused: boolean }) {
     return due.length ? { occ: due[due.length - 1], left: due.length - 1 } : null;
   }, [occs, tick, focus, later, today]);
 
-  useEffect(() => { setMode('ask'); }, [current?.occ.key]);
+  // Nouvelle tâche affichée : on repart sur la question (sauf bouton « Décaler » de la notif)
+  useEffect(() => {
+    if (!current) return;
+    setMode(wantPostpone.current && current.occ.key === focus ? 'postpone' : 'ask');
+    wantPostpone.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.occ.key]);
 
   if (!current || paused) return null;
   const { occ, left } = current;

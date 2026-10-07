@@ -31,7 +31,7 @@ export interface NotifSettings {
 
 export const DEFAULTS = { notifyBefore: 10, notifyMorning: '08:00', notifyEvening: '21:00', notifyEnd: true };
 
-export interface Notif { key: string; title: string; body: string; tag: string; url?: string }
+export interface Notif { key: string; title: string; body: string; tag: string; url?: string; occKey?: string }
 
 // ——— Dates (clés YYYY-MM-DD, calculs en UTC pour éviter les surprises) ———
 
@@ -149,9 +149,10 @@ export function computeNotifications(args: {
         push({
           key: `end:${o.key}:${o.task.startTime}`, // l'heure dans la clé : une tâche décalée au même jour redemande
           title: `${o.task.title} : c'est fait ?`,
-          body: `${hhmm(o.start)} – ${hhmm(o.start + o.task.durationMin)} · Touche pour cocher ou décaler`,
+          body: `${hhmm(o.start)} – ${hhmm(o.start + o.task.durationMin)}`,
           tag: `end-${o.key}`,
           url: `/?fin=${encodeURIComponent(o.key)}`,
+          occKey: o.key,
         });
       }
     }
