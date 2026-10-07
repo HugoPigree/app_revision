@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCategories, useSettings, typeOf, useTypes } from '../db';
 import { addDays, dateRange, DAY_LETTERS, DAY_SHORT, fmtLongDay, fmtMonth, fromKey, minToTime, nowMin, startOfWeek, todayKey, weekday } from '../lib/dates';
 import { useOccurrences, type Occurrence } from '../lib/recurrence';
+import { dayColors, NO_CAT_COLOR } from '../lib/colors';
 import { moveOccurrence } from '../lib/move';
 import { DESKTOP, Icon, useMedia, useUI } from '../ui';
 
@@ -65,6 +66,15 @@ export function CalendarView() {
   const weekDays = dateRange(weekStart, addDays(weekStart, 6));
   const occs = useOccurrences(weekStart, addDays(weekStart, 6)) ?? [];
   const shown = view === 'week' ? weekDays : [date];
+  // Couleur d'affichage de chaque tâche : jamais deux fois la même dans une journée
+  const colorOf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of weekDays) {
+      const dayItems = occs.filter((o) => o.date === d);
+      dayColors(dayItems, (o) => cats.get(o.task.categoryId ?? '')?.color ?? NO_CAT_COLOR).forEach((c, k) => m.set(k, c));
+    }
+    return (o: Occurrence) => m.get(o.key) ?? cats.get(o.task.categoryId ?? '')?.color ?? NO_CAT_COLOR;
+  }, [occs, cats, weekDays.join()]);
   const H = desktop ? (view === 'week' ? 54 : 64) : view === 'week' ? 46 : 60;
 
   const { startH, endH } = useMemo(() => {
@@ -209,7 +219,7 @@ export function CalendarView() {
                 <span className="dn">{fromKey(d).getDate()}</span>
                 <span className="dots">
                   {dots.slice(0, 3).map((o) => (
-                    <i key={o.key} style={{ background: cats.get(o.task.categoryId ?? '')?.color ?? 'var(--muted)' }} />
+                    <i key={o.key} style={{ background: colorOf(o) }} />
                   ))}
                 </span>
               </button>
@@ -236,6 +246,7 @@ export function CalendarView() {
               >
                 {dayOccs.map(({ occ, lane, lanes }) => {
                   const cat = cats.get(occ.task.categoryId ?? '');
+                  const color = colorOf(occ);
                   const top = ((occ.start - startH * 60) / 60) * H;
                   const height = Math.max(((occ.end - occ.start) / 60) * H, 22);
                   return (
@@ -246,7 +257,7 @@ export function CalendarView() {
                         top, height,
                         left: `calc(${(lane / lanes) * 100}% + 1px)`,
                         width: `calc(${100 / lanes}% - 2px)`,
-                        ['--c' as string]: cat?.color ?? '#7b808a',
+                        ['--c' as string]: color,
                       }}
                       onClick={() => { if (!suppressClick.current) ui.openOccurrence(occ); }}
                       onPointerDown={(e) => onEvDown(occ, e)}
@@ -276,7 +287,7 @@ export function CalendarView() {
                   return (
                     <div
                       className={`event ghost ${view}`}
-                      style={{ top: ((drag.start - startH * 60) / 60) * H, height: Math.max((dur / 60) * H, 22), left: 1, width: 'calc(100% - 2px)', ['--c' as string]: cats.get(o.task.categoryId ?? '')?.color ?? '#7b808a' }}
+                      style={{ top: ((drag.start - startH * 60) / 60) * H, height: Math.max((dur / 60) * H, 22), left: 1, width: 'calc(100% - 2px)', ['--c' as string]: colorOf(o) }}
                     >
                       <span className="ev-title">{o.task.title}</span>
                       <span className="ev-meta">{minToTime(drag.start)} – {minToTime(drag.start + dur)}</span>

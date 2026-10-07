@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { catType, db, deleteCategory, deleteType, PALETTE, resetLocalDB, typeOf, uid, useSettings, useTypes, type Settings } from '../db';
+import { catType, db, deleteCategory, deleteType, resetLocalDB, typeOf, uid, useSettings, useTypes, type Settings } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
+import { pickDistinctColor } from '../lib/colors';
 import { Icon, LiveInput, useUI } from '../ui';
 
 function Stepper({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
@@ -222,7 +223,7 @@ export function SettingsView() {
                 </ul>
                 <button
                   className="btn ghost add-cat"
-                  onClick={() => db.categories.add({ id: uid(), name: 'Nouvelle catégorie', color: PALETTE[cats.length % PALETTE.length], type: ty.id })}
+                  onClick={() => db.categories.add({ id: uid(), name: 'Nouvelle catégorie', color: pickDistinctColor(cats.map((c) => c.color)), type: ty.id })}
                 >
                   <Icon name="plus" size={16} /> Ajouter une catégorie
                 </button>

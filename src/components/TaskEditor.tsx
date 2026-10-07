@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { catType, db, deleteCategory, deleteTask, typeOf, uid, PALETTE, useCategories, useTypes, type Recurrence, type Task, type TaskType } from '../db';
+import { catType, db, deleteCategory, deleteTask, typeOf, uid, useCategories, useTypes, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
+import { pickDistinctColor } from '../lib/colors';
 import { Icon, Sheet, useUI } from '../ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
@@ -85,7 +86,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const addCategory = async () => {
     const name = newCat?.trim();
     if (!name) return setNewCat(null);
-    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length], type: ty.id });
+    const id = await db.categories.add({ id: uid(), name, color: pickDistinctColor(cats.map((c) => c.color)), type: ty.id });
     set({ categoryId: id });
     setNewCat(null);
   };
