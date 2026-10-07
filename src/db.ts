@@ -13,6 +13,8 @@ export interface Category {
   id: string;
   name: string;
   color: string;
+  /** Catégorie de révisions ou d'activités (absent sur les anciennes données : voir catType) */
+  type?: TaskType;
 }
 
 export interface Task {
@@ -78,12 +80,36 @@ export const PALETTE = [
 
 /** Catégories par défaut : ids fixes pour qu'elles soient les mêmes sur tous les appareils */
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-maths', name: 'Maths', color: PALETTE[0] },
-  { id: 'cat-anglais', name: 'Anglais', color: PALETTE[3] },
-  { id: 'cat-info', name: 'Info', color: PALETTE[5] },
-  { id: 'cat-sport', name: 'Sport', color: PALETTE[2] },
-  { id: 'cat-perso', name: 'Perso', color: PALETTE[4] },
+  { id: 'cat-maths', name: 'Maths', color: PALETTE[0], type: 'revision' },
+  { id: 'cat-anglais', name: 'Anglais', color: PALETTE[3], type: 'revision' },
+  { id: 'cat-info', name: 'Info', color: PALETTE[5], type: 'revision' },
+  { id: 'cat-sport', name: 'Sport', color: PALETTE[2], type: 'activity' },
+  { id: 'cat-perso', name: 'Perso', color: PALETTE[4], type: 'activity' },
 ];
+
+const ACTIVITY_WORDS = /sport|salle|muscu|course|running|foot|basket|tennis|natation|piscine|perso|boulot|travail|job|taf|loisir|sortie|courses|ménage|menage|projet|cuisine|jeu|lecture/i;
+
+/** Type d'une catégorie, avec une valeur par défaut pour les anciennes données sans type */
+export function catType(c: Category): TaskType {
+  if (c.type) return c.type;
+  const def = DEFAULT_CATEGORIES.find((d) => d.id === c.id);
+  if (def?.type) return def.type;
+  return ACTIVITY_WORDS.test(c.name) ? 'activity' : 'revision';
+}
+
+/** Donne un type aux catégories qui n'en ont pas, d'après les tâches qui les utilisent */
+export async function fixCategoryTypes(): Promise<void> {
+  const untyped = (await db.categories.toArray()).filter((c) => !c.type);
+  if (!untyped.length) return;
+  const tasks = await db.tasks.toArray();
+  for (const c of untyped) {
+    const used = tasks.filter((t) => t.categoryId === c.id);
+    const act = used.filter((t) => t.type === 'activity').length;
+    const rev = used.length - act;
+    const type: TaskType = used.length ? (act > rev ? 'activity' : act < rev ? 'revision' : catType(c)) : catType(c);
+    await db.categories.update(c.id, { type });
+  }
+}
 
 export function uid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -180,6 +206,11 @@ export async function resetLocalDB(): Promise<void> {
   });
 }
 
+/** À lancer à chaque démarrage : corrections de données sans effet si déjà faites */
+export async function repairDB(): Promise<void> {
+  await fixCategoryTypes();
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Convertit des données v1 (ids numériques) vers le format actuel (ids texte) */
 export function convertV1(src: { categories: any[]; tasks: any[]; occStates: any[]; sessions: any[] }) {
@@ -189,7 +220,7 @@ export function convertV1(src: { categories: any[]; tasks: any[]; occStates: any
       const def = DEFAULT_CATEGORIES.find((d) => d.name === c.name);
       const id = def && ![...catMap.values()].includes(def.id) ? def.id : uid();
       catMap.set(c.id, id);
-      return { id, name: c.name, color: c.color };
+      return { id, name: c.name, color: c.color, ...(def && def.id === id ? { type: def.type } : {}) };
     });
     const taskMap = new Map<number, string>();
     const newTasks: Task[] = tasks.map((t) => {

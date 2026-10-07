@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { db, deleteCategory, PALETTE, resetLocalDB, uid, useSettings, type Settings } from '../db';
+import { catType, db, deleteCategory, PALETTE, resetLocalDB, uid, useSettings, type Settings, type TaskType } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
 import { Icon, useUI } from '../ui';
@@ -144,27 +144,48 @@ export function SettingsView() {
           <Stepper label="Fin de journée" value={s.dayEndHour} min={s.dayStartHour + 1} max={24} unit="h" onChange={(v) => update({ dayEndHour: v })} />
         </section>
 
-        <section className="card">
+        <section className="card cats-card">
           <h2 className="section-title">Catégories</h2>
-          <ul className="cat-list">
-            {cats.map((c) => (
-              <li key={c.id}>
-                <div className="swatches">
-                  <input
-                    type="color"
-                    value={c.color}
-                    onChange={(e) => db.categories.update(c.id!, { color: e.target.value })}
-                    aria-label={`Couleur de ${c.name}`}
-                  />
-                </div>
-                <input className="cat-name" value={c.name} onChange={(e) => db.categories.update(c.id!, { name: e.target.value })} />
-                <button className="icon-btn" onClick={() => removeCat(c.id!, c.name)} aria-label={`Supprimer ${c.name}`}><Icon name="trash" size={18} /></button>
-              </li>
-            ))}
-          </ul>
-          <button className="btn secondary" onClick={() => db.categories.add({ id: uid(), name: 'Nouvelle catégorie', color: PALETTE[cats.length % PALETTE.length] })}>
-            <Icon name="plus" size={18} /> Ajouter une catégorie
-          </button>
+          {(['revision', 'activity'] as TaskType[]).map((ty) => {
+            const list = cats.filter((c) => catType(c) === ty);
+            const other: TaskType = ty === 'revision' ? 'activity' : 'revision';
+            return (
+              <div key={ty} className="cat-group">
+                <h3 className="cat-group-title">{ty === 'revision' ? 'Révisions' : 'Activités'}</h3>
+                <ul className="cat-list">
+                  {list.map((c) => (
+                    <li key={c.id}>
+                      <div className="swatches">
+                        <input
+                          type="color"
+                          value={c.color}
+                          onChange={(e) => db.categories.update(c.id, { color: e.target.value })}
+                          aria-label={`Couleur de ${c.name}`}
+                        />
+                      </div>
+                      <input className="cat-name" value={c.name} onChange={(e) => db.categories.update(c.id, { name: e.target.value })} />
+                      <button
+                        className="cat-move"
+                        onClick={() => db.categories.update(c.id, { type: other })}
+                        title={`Passer dans ${other === 'revision' ? 'Révisions' : 'Activités'}`}
+                        aria-label={`Passer ${c.name} dans ${other === 'revision' ? 'Révisions' : 'Activités'}`}
+                      >
+                        → {other === 'revision' ? 'Révisions' : 'Activités'}
+                      </button>
+                      <button className="icon-btn" onClick={() => removeCat(c.id, c.name)} aria-label={`Supprimer ${c.name}`}><Icon name="trash" size={18} /></button>
+                    </li>
+                  ))}
+                  {!list.length && <li className="muted small">Aucune catégorie.</li>}
+                </ul>
+                <button
+                  className="btn ghost add-cat"
+                  onClick={() => db.categories.add({ id: uid(), name: ty === 'revision' ? 'Nouvelle matière' : 'Nouvelle activité', color: PALETTE[cats.length % PALETTE.length], type: ty })}
+                >
+                  <Icon name="plus" size={16} /> {ty === 'revision' ? 'Ajouter une matière' : 'Ajouter une catégorie d’activité'}
+                </button>
+              </div>
+            );
+          })}
         </section>
 
         <section className="card">

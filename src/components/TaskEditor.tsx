@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, deleteCategory, deleteTask, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
+import { catType, db, deleteCategory, deleteTask, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -66,6 +66,13 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     onClose();
   };
 
+  // Seules les catégories du type choisi (révision / activité) sont proposées
+  const shownCats = cats.filter((c) => catType(c) === t.type || c.id === t.categoryId);
+  const switchType = (ty: TaskType) => {
+    const cur = cats.find((c) => c.id === t.categoryId);
+    set({ type: ty, ...(cur && catType(cur) !== ty ? { categoryId: null } : {}) });
+  };
+
   const removeCategory = async (id: string, name: string) => {
     const wasSelected = t.categoryId === id;
     const undo = await deleteCategory(id);
@@ -76,7 +83,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const addCategory = async () => {
     const name = newCat?.trim();
     if (!name) return setNewCat(null);
-    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length] });
+    const id = await db.categories.add({ id: uid(), name, color: PALETTE[cats.length % PALETTE.length], type: t.type });
     set({ categoryId: id });
     setNewCat(null);
   };
@@ -94,7 +101,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
 
         <div className="seg full">
           {(['revision', 'activity'] as TaskType[]).map((ty) => (
-            <button key={ty} className={t.type === ty ? 'on' : ''} onClick={() => set({ type: ty })}>
+            <button key={ty} className={t.type === ty ? 'on' : ''} onClick={() => switchType(ty)}>
               {ty === 'revision' ? 'Révision' : 'Activité'}
             </button>
           ))}
@@ -108,7 +115,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
         <label className="field-label">Catégorie</label>
         <div className="chips">
           <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
-          {cats.map((c) => (
+          {shownCats.map((c) => (
             <span key={c.id} className={`chip removable ${t.categoryId === c.id ? 'on' : ''}`} style={{ ['--c' as string]: c.color }}>
               <button className="chip-main" onClick={() => set({ categoryId: c.id! })}>
                 <i className="dot" /> {c.name}
@@ -119,7 +126,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
             </span>
           ))}
           {newCat === null ? (
-            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> Catégorie</button>
+            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> {t.type === 'revision' ? 'Matière' : 'Catégorie'}</button>
           ) : (
             <span className="chip-input">
               <input autoFocus value={newCat} placeholder="Nom" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCategory()} />

@@ -1,6 +1,6 @@
 import { createClient, type Session as AuthSession, type SupabaseClient } from '@supabase/supabase-js';
 import { useSyncExternalStore } from 'react';
-import { db, markRemote, onLocalChange, SYNCED, type SyncedTable } from '../db';
+import { db, fixCategoryTypes, markRemote, onLocalChange, SYNCED, type SyncedTable } from '../db';
 
 /**
  * Synchro « hors ligne d'abord » :
@@ -150,6 +150,7 @@ async function pull(userId: string) {
     const rows = (data ?? []) as RemoteRow[];
     if (!rows.length) break;
     await applyRemote(rows);
+    if (rows.some((r) => r.tbl === 'categories')) await fixCategoryTypes();
     since = rows[rows.length - 1].updated_at;
     localStorage.setItem(lastPullKey(userId), since);
     if (rows.length < 1000) break;

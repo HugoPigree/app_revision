@@ -489,3 +489,11 @@ p { margin: 0; }
 .sync-state.offline i { background: var(--muted); }
 .sync-state.error i { background: var(--work); }
 @media (min-width: 900px) { .settings .account { grid-column: 1 / -1; } }
+
+/* ——— Catégories par type ——— */
+.cat-group { display: flex; flex-direction: column; gap: 6px; }
+.cat-group + .cat-group { border-top: 1px solid var(--line); padding-top: 12px; }
+.cat-group-title { font-size: 15px; font-weight: 700; }
+.cat-move { font-size: 12px; font-weight: 650; color: var(--muted); padding: 6px 8px; border-radius: 8px; white-space: nowrap; background: var(--surface-2); }
+.add-cat { align-self: flex-start; padding: 8px 4px; font-size: 14px; }
+@media (min-width: 900px) { .settings .cats-card { grid-row: span 2; } }
