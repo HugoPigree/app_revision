@@ -31,12 +31,7 @@ export async function moveOccurrence(ui: UI, occ: Occurrence, date: string, star
   if (!choice) return;
 
   if (choice === 'one') {
-    // On retire ce jour de la série et on crée une tâche ponctuelle au nouvel emplacement
-    const { id: _id, ...rest } = task;
-    void _id;
-    const newId = await db.tasks.add({ ...rest, id: uid(), recurrence: { kind: 'none' }, startDate: date, startTime: time, endDate: null, createdAt: Date.now() });
-    await setOccStatus(task.id!, occ.date, 'skipped');
-    if (occ.status === 'done') await setOccStatus(newId, date, 'done');
+    await moveThisDayOnly(occ, date, time);
     ui.toast(`Déplacée ${where} (ce jour seulement)`);
     return;
   }
@@ -52,4 +47,28 @@ export async function moveOccurrence(ui: UI, occ: Occurrence, date: string, star
     await db.tasks.update(task.id!, { startTime: time, startDate: addDays(task.startDate, shift) });
   }
   ui.toast('Toutes les répétitions ont été déplacées');
+}
+
+/** Retire ce jour de la série et crée une tâche ponctuelle au nouvel emplacement */
+async function moveThisDayOnly(occ: Occurrence, date: string, time: string): Promise<string> {
+  const { id: _id, ...rest } = occ.task;
+  void _id;
+  const newId = await db.tasks.add({ ...rest, id: uid(), recurrence: { kind: 'none' }, startDate: date, startTime: time, endDate: null, createdAt: Date.now() });
+  await setOccStatus(occ.task.id!, occ.date, 'skipped');
+  if (occ.status === 'done') await setOccStatus(newId, date, 'done');
+  return newId;
+}
+
+/**
+ * Décale une occurrence (fin de tâche pas faite) : sans question,
+ * une tâche récurrente n'est décalée que pour ce jour-là.
+ */
+export async function postponeOccurrence(occ: Occurrence, date: string, startMin: number): Promise<string> {
+  const time = minToTime(startMin);
+  if (occ.task.recurrence.kind === 'none') {
+    await db.tasks.update(occ.task.id!, { startDate: date, startTime: time, createdAt: Date.now() });
+  } else {
+    await moveThisDayOnly(occ, date, time);
+  }
+  return `${relativeDay(date)} à ${time}`;
 }

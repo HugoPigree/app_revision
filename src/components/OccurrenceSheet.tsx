@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteTask, setOccStatus, typeOf, useCategories, useTypes } from '../db';
 import { fmtDuration, fmtLongDay, minToTime } from '../lib/dates';
 import { describeRecurrence, type Occurrence } from '../lib/recurrence';
+import { useState } from 'react';
+import { PostponePicker } from './EndCheck';
 import { Icon, Sheet, useUI } from '../ui';
 
 export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: () => void }) {
@@ -13,6 +15,7 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
   const recurring = task.recurrence.kind !== 'none';
   const sessions = useLiveQuery(() => db.sessions.where('taskId').equals(task.id!).toArray(), [task.id]) ?? [];
   const sessionsHere = sessions.filter((s) => s.occKey === occ.key);
+  const [postponing, setPostponing] = useState(false);
 
   const toggleDone = async () => {
     await setOccStatus(task.id!, occ.date, occ.status === 'done' ? null : 'done');
@@ -67,6 +70,14 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
           <button className={`btn ${isRev ? 'secondary' : 'primary big'}`} onClick={toggleDone}>
             <Icon name="check" size={18} /> {occ.status === 'done' ? 'Marquer comme non faite' : 'Marquer comme faite'}
           </button>
+          {occ.status !== 'done' && !postponing && (
+            <button className="btn secondary" onClick={() => setPostponing(true)}>
+              <Icon name="clock" size={18} /> Décaler
+            </button>
+          )}
+          {postponing && (
+            <PostponePicker occ={occ} onBack={() => setPostponing(false)} onDone={(where) => { ui.toast(`Décalée ${where}`); onClose(); }} />
+          )}
           <div className="row2">
             <button className="btn secondary" onClick={() => { onClose(); ui.openEditor(task); }}>
               <Icon name="edit" size={18} /> Modifier

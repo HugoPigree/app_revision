@@ -9,6 +9,7 @@ import { StatsView } from './components/Stats';
 import { TaskEditor } from './components/TaskEditor';
 import { TasksView } from './components/Tasks';
 import { AuthScreen } from './components/AuthScreen';
+import { EndCheck } from './components/EndCheck';
 import { cancelPush, refreshPushSubscription } from './lib/push';
 import { cloudEnabled, useSync } from './lib/sync';
 import { ConfirmDialog, Icon, UIContext, type AskOptions, type ReviewCtx, type UI } from './ui';
@@ -149,6 +150,7 @@ export default function App() {
             onDone={() => setReview(null)}
           />
         )}
+        <EndCheck paused={!!(editor || occ || review || asking)} />
         {asking && <ConfirmDialog opts={asking} onAnswer={answer} />}
         {toast && (
           <div className={`toast ${toast.action ? 'has-action' : ''}`} key={toast.n}>

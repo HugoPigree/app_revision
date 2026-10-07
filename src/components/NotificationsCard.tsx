@@ -105,6 +105,10 @@ export function NotificationsCard() {
           </select>
         </div>
         <div className="notif-row">
+          <span>Fin de tâche : « c’est fait ? »</span>
+          <Switch checked={s.notifyEnd} onChange={(v) => update({ notifyEnd: v })} label="Fin de tâche" />
+        </div>
+        <div className="notif-row">
           <span>Fin de pomodoro et de pause</span>
           <Switch checked={s.notifyPomodoro} onChange={(v) => update({ notifyPomodoro: v })} label="Fin de pomodoro et de pause" />
         </div>

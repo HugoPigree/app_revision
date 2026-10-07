@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         // On note d'abord l'envoi : si deux appels se chevauchent, un seul gagne
         const { error: insErr } = await supabase.from('cadence_sent_notifications').insert({ user_id: userId, key: n.key });
         if (insErr) continue;
-        await sendToUser(subs, { title: n.title, body: n.body, tag: n.tag, url: '/' }, vapid, stats);
+        await sendToUser(subs, { title: n.title, body: n.body, tag: n.tag, url: n.url ?? '/' }, vapid, stats);
       }
     }
 

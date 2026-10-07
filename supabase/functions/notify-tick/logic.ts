@@ -11,6 +11,7 @@ export type Recurrence =
 
 export interface Task {
   id: string;
+  createdAt?: number;
   title: string;
   startDate: string;
   startTime: string;
@@ -25,11 +26,12 @@ export interface NotifSettings {
   notifyBefore?: number | null; // minutes avant (0 = à l'heure, null = désactivé)
   notifyMorning?: string | null; // "08:00" ou null
   notifyEvening?: string | null; // "21:00" ou null
+  notifyEnd?: boolean; // « C'est fait ? » à la fin de chaque tâche
 }
 
-export const DEFAULTS = { notifyBefore: 10, notifyMorning: '08:00', notifyEvening: '21:00' };
+export const DEFAULTS = { notifyBefore: 10, notifyMorning: '08:00', notifyEvening: '21:00', notifyEnd: true };
 
-export interface Notif { key: string; title: string; body: string; tag: string }
+export interface Notif { key: string; title: string; body: string; tag: string; url?: string }
 
 // ——— Dates (clés YYYY-MM-DD, calculs en UTC pour éviter les surprises) ———
 
@@ -134,6 +136,26 @@ export function computeNotifications(args: {
   }
 
   const todays = occurrences(args.tasks, states, today);
+
+  // 4. Fin de tâche : « c'est fait ? » (fenêtre de 30 min après la fin, hier inclus pour les tâches qui passent minuit)
+  if (s.notifyEnd) {
+    for (const [date, offset] of [[addDays(today, -1), -1440], [today, 0]] as const) {
+      for (const o of occurrences(args.tasks, states, date)) {
+        if (o.status === 'done') continue;
+        const end = o.start + o.task.durationMin + offset;
+        if (nowMin < end || nowMin >= end + 30) continue;
+        // Tâche ajoutée après coup (déjà finie au moment de sa création) : on ne demande rien
+        if (o.task.createdAt && o.task.createdAt > args.now.getTime() - (nowMin - end) * 60000) continue;
+        push({
+          key: `end:${o.key}:${o.task.startTime}`, // l'heure dans la clé : une tâche décalée au même jour redemande
+          title: `${o.task.title} : c'est fait ?`,
+          body: `${hhmm(o.start)} – ${hhmm(o.start + o.task.durationMin)} · Touche pour cocher ou décaler`,
+          tag: `end-${o.key}`,
+          url: `/?fin=${encodeURIComponent(o.key)}`,
+        });
+      }
+    }
+  }
 
   // 2. Récap du matin (fenêtre de 3 h après l'heure choisie)
   if (s.notifyMorning) {

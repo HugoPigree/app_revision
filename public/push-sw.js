@@ -21,7 +21,10 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if ('focus' in c) return c.focus();
+        if ('focus' in c) {
+          c.postMessage({ type: 'open', url: url });
+          return c.focus();
+        }
       }
       return self.clients.openWindow(url);
     }),

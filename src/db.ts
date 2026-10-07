@@ -95,6 +95,8 @@ export interface Settings {
   notifyMorning: string | null;
   /** Heure du rappel des tâches non faites ("21:00") ou null */
   notifyEvening: string | null;
+  /** « C'est fait ? » à la fin de chaque tâche */
+  notifyEnd: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -109,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   notifyPomodoro: true,
   notifyMorning: '08:00',
   notifyEvening: '21:00',
+  notifyEnd: true,
 };
 
 export const PALETTE = [
