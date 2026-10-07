@@ -117,21 +117,55 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     setNewCat(null);
   };
 
+  const tyIndex = types.findIndex((o) => o.id === ty.id);
+
   return (
     <Sheet title={task ? 'Modifier la tâche' : 'Nouvelle tâche'} onClose={onClose}>
       <div className="form">
         <input
           className="title-input"
-          placeholder={`Titre (facultatif) · ${fallbackTitle}`}
+          placeholder={`Titre (facultatif) : ${fallbackTitle}`}
           value={t.title}
           onChange={(e) => set({ title: e.target.value })}
           autoFocus={!task}
         />
 
-        <div className="chips type-chips">
-          {types.map((o) =>
-            editingType === o.id ? (
-              <span key={o.id} className="chip-input">
+        {/* Parent : la grande catégorie (onglets) — enfant : ses catégories (dans le panneau) */}
+        <section className="type-group">
+          <div className="type-tabs" role="tablist" aria-label="Grande catégorie">
+            {types.map((o) => (
+              <button
+                key={o.id}
+                role="tab"
+                aria-selected={ty.id === o.id}
+                className={`type-tab ${ty.id === o.id ? 'on' : ''}`}
+                onClick={() => switchType(o.id)}
+              >
+                <Icon name={o.pomodoro ? 'clock' : 'check'} size={15} />
+                {o.name}
+              </button>
+            ))}
+            <button className="type-tab add" onClick={() => setNewType('')} aria-label="Ajouter une grande catégorie">
+              <Icon name="plus" size={16} />
+            </button>
+          </div>
+
+          <div className={`type-panel ${tyIndex === 0 ? 'first-on' : ''}`} role="tabpanel">
+            {newType !== null ? (
+              <div className="type-edit">
+                <input
+                  autoFocus
+                  value={newType}
+                  placeholder="Nom de la grande catégorie (ex. Cours)"
+                  aria-label="Nom de la grande catégorie"
+                  onChange={(e) => setNewType(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void addType(); if (e.key === 'Escape') setNewType(null); }}
+                />
+                <button className="btn primary" onClick={addType}>Créer</button>
+                <button className="btn ghost" onClick={() => setNewType(null)}>Annuler</button>
+              </div>
+            ) : editingType ? (
+              <div className="type-edit">
                 <input
                   autoFocus
                   value={editName}
@@ -139,147 +173,140 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
                   onChange={(e) => setEditName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void saveRename(); if (e.key === 'Escape') setEditingType(null); }}
                 />
-                <button onClick={saveRename}>OK</button>
-              </span>
+                <button className="btn primary" onClick={saveRename}>Renommer</button>
+                <button className="btn ghost" onClick={() => setEditingType(null)}>Annuler</button>
+              </div>
             ) : (
-              <span key={o.id} className={`chip removable type-chip ${ty.id === o.id ? 'on' : ''}`}>
-                <button className="chip-main" onClick={() => switchType(o.id)}>{o.name}</button>
-                {ty.id === o.id && (
-                  <button className="chip-x" onClick={() => { setEditingType(o.id); setEditName(o.name); }} aria-label={`Renommer ${o.name}`}>
-                    <Icon name="edit" size={13} />
-                  </button>
-                )}
+              <div className="type-head">
+                <strong className="type-title">{ty.name}</strong>
+                <button className="icon-btn sm" onClick={() => { setEditingType(ty.id); setEditName(ty.name); }} aria-label={`Renommer ${ty.name}`}>
+                  <Icon name="edit" size={17} />
+                </button>
                 {types.length > 1 && (
-                  <button className="chip-x" onClick={() => removeType(o.id)} aria-label={`Supprimer la grande catégorie ${o.name}`}>
-                    <Icon name="close" size={13} />
+                  <button className="icon-btn sm" onClick={() => removeType(ty.id)} aria-label={`Supprimer la grande catégorie ${ty.name}`}>
+                    <Icon name="trash" size={17} />
                   </button>
                 )}
+              </div>
+            )}
+
+            <label className="mode-row">
+              <span className="mode-text">
+                {ty.pomodoro ? 'Se lance en Pomodoro et compte dans ton bilan' : 'Se coche simplement comme fait'}
               </span>
-            ),
-          )}
-          {newType === null ? (
-            <button className="chip ghost" onClick={() => setNewType('')} aria-label="Ajouter une grande catégorie"><Icon name="plus" size={14} /> Ajouter</button>
-          ) : (
-            <span className="chip-input">
-              <input
-                autoFocus
-                value={newType}
-                placeholder="Ex. Cours"
-                aria-label="Nom de la grande catégorie"
-                onChange={(e) => setNewType(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') void addType(); if (e.key === 'Escape') setNewType(null); }}
-              />
-              <button onClick={addType}>OK</button>
-            </span>
-          )}
-        </div>
-        <div className="type-hint">
-          <p className="hint">
-            {ty.pomodoro
-              ? `« ${ty.name} » se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.`
-              : `« ${ty.name} » se coche simplement comme fait, sans Pomodoro.`}
-          </p>
-          <label className="switch" title="Mode Pomodoro">
-            <input type="checkbox" checked={ty.pomodoro} onChange={(e) => db.types.update(ty.id, { pomodoro: e.target.checked })} aria-label={`Pomodoro pour ${ty.name}`} />
-            <span className="switch-track"><span /></span>
-            <span className="switch-label">Pomodoro</span>
-          </label>
-        </div>
-
-        <label className="field-label">Catégorie</label>
-        <div className="chips">
-          <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
-          {shownCats.map((c) => (
-            <span key={c.id} className={`chip removable ${t.categoryId === c.id ? 'on' : ''}`} style={{ ['--c' as string]: c.color }}>
-              <button className="chip-main" onClick={() => set({ categoryId: c.id! })}>
-                <i className="dot" /> {c.name}
-              </button>
-              <button className="chip-x" onClick={() => removeCategory(c.id!, c.name)} aria-label={`Supprimer la catégorie ${c.name}`}>
-                <Icon name="close" size={13} />
-              </button>
-            </span>
-          ))}
-          {newCat === null ? (
-            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> Catégorie</button>
-          ) : (
-            <span className="chip-input">
-              <input autoFocus value={newCat} placeholder="Nom" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCategory()} />
-              <button onClick={addCategory}>OK</button>
-            </span>
-          )}
-        </div>
-
-        <div className="row2">
-          <div>
-            <label className="field-label">{rec.kind === 'none' ? 'Date' : 'À partir du'}</label>
-            <input type="date" value={t.startDate} onChange={(e) => e.target.value && set({ startDate: e.target.value })} />
-          </div>
-          <div>
-            <label className="field-label">Heure</label>
-            <input type="time" value={t.startTime} onChange={(e) => e.target.value && set({ startTime: e.target.value })} />
-          </div>
-        </div>
-
-        <label className="field-label">Durée</label>
-        <div className="chips">
-          {DURATIONS.map((d) => (
-            <button key={d} className={`chip ${t.durationMin === d ? 'on' : ''}`} onClick={() => set({ durationMin: d })}>
-              {fmtDuration(d)}
-            </button>
-          ))}
-          <span className="chip-input">
-            <input type="number" inputMode="numeric" min={5} max={720} value={t.durationMin} onChange={(e) => set({ durationMin: Number(e.target.value) })} />
-            <span>min</span>
-          </span>
-        </div>
-
-        <label className="field-label">Répétition</label>
-        <div className="seg full">
-          <button className={rec.kind === 'none' ? 'on' : ''} onClick={() => setRecKind('none')}>Aucune</button>
-          <button className={rec.kind === 'weekly' ? 'on' : ''} onClick={() => setRecKind('weekly')}>Jours fixes</button>
-          <button className={rec.kind === 'daily' ? 'on' : ''} onClick={() => setRecKind('daily')}>Tous les X jours</button>
-        </div>
-
-        {rec.kind === 'weekly' && (
-          <>
-            <div className="weekdays">
-              {DAY_LETTERS.map((l, i) => (
-                <button key={i} className={rec.days.includes(i) ? 'on' : ''} onClick={() => toggleDay(i)}>{l}</button>
-              ))}
-            </div>
-            <div className="inline-num">
-              Toutes les
-              <input type="number" inputMode="numeric" min={1} max={8} value={rec.interval} onChange={(e) => set({ recurrence: { ...rec, interval: Math.max(1, Number(e.target.value) || 1) } })} />
-              semaine{rec.interval > 1 ? 's' : ''}
-            </div>
-          </>
-        )}
-        {rec.kind === 'daily' && (
-          <div className="inline-num">
-            Tous les
-            <input type="number" inputMode="numeric" min={1} max={60} value={rec.every} onChange={(e) => set({ recurrence: { kind: 'daily', every: Math.max(1, Number(e.target.value) || 1) } })} />
-            jour{rec.every > 1 ? 's' : ''}
-          </div>
-        )}
-        {rec.kind !== 'none' && (
-          <div className="end-row">
-            <label className="toggle">
-              <input type="checkbox" checked={t.endDate !== null} onChange={(e) => set({ endDate: e.target.checked ? t.startDate : null })} />
-              <span>Date de fin</span>
+              <span className="switch">
+                <input type="checkbox" checked={ty.pomodoro} onChange={(e) => db.types.update(ty.id, { pomodoro: e.target.checked })} aria-label={`Pomodoro pour ${ty.name}`} />
+                <span className="switch-track"><span /></span>
+                <span className="switch-label">Pomodoro</span>
+              </span>
             </label>
-            {t.endDate !== null && <input type="date" value={t.endDate} onChange={(e) => e.target.value && set({ endDate: e.target.value })} />}
-          </div>
-        )}
 
-        <label className="field-label">Notes</label>
-        <textarea rows={2} placeholder="Pages, exercices, objectifs…" value={t.notes} onChange={(e) => set({ notes: e.target.value })} />
+            <div className="sub-label">Catégorie</div>
+            <div className="chips cat-chips">
+              <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
+              {shownCats.map((c) => (
+                <span key={c.id} className={`chip cat-chip removable ${t.categoryId === c.id ? 'on' : ''}`} style={{ ['--c' as string]: c.color }}>
+                  <button className="chip-main" onClick={() => set({ categoryId: c.id! })}>
+                    <i className="dot" /> {c.name}
+                  </button>
+                  {t.categoryId === c.id && (
+                    <button className="chip-x" onClick={() => removeCategory(c.id!, c.name)} aria-label={`Supprimer la catégorie ${c.name}`}>
+                      <Icon name="close" size={13} />
+                    </button>
+                  )}
+                </span>
+              ))}
+              {newCat === null ? (
+                <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> Catégorie</button>
+              ) : (
+                <span className="chip-input">
+                  <input autoFocus value={newCat} placeholder="Nom" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void addCategory(); if (e.key === 'Escape') setNewCat(null); }} />
+                  <button onClick={addCategory}>OK</button>
+                </span>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="group">
+          <h3 className="group-title">Quand</h3>
+          <div className="row2">
+            <div>
+              <label className="field-label">{rec.kind === 'none' ? 'Date' : 'À partir du'}</label>
+              <input type="date" value={t.startDate} onChange={(e) => e.target.value && set({ startDate: e.target.value })} />
+            </div>
+            <div>
+              <label className="field-label">Heure</label>
+              <input type="time" value={t.startTime} onChange={(e) => e.target.value && set({ startTime: e.target.value })} />
+            </div>
+          </div>
+          <label className="field-label">Durée</label>
+          <div className="chips">
+            {DURATIONS.map((d) => (
+              <button key={d} className={`chip ${t.durationMin === d ? 'on' : ''}`} onClick={() => set({ durationMin: d })}>
+                {fmtDuration(d)}
+              </button>
+            ))}
+            <span className="chip-input">
+              <input type="number" inputMode="numeric" min={5} max={720} value={t.durationMin} onChange={(e) => set({ durationMin: Number(e.target.value) })} aria-label="Durée en minutes" />
+              <span>min</span>
+            </span>
+          </div>
+        </section>
+
+        <section className="group">
+          <h3 className="group-title">Répétition</h3>
+          <div className="seg full">
+            <button className={rec.kind === 'none' ? 'on' : ''} onClick={() => setRecKind('none')}>Aucune</button>
+            <button className={rec.kind === 'weekly' ? 'on' : ''} onClick={() => setRecKind('weekly')}>Jours fixes</button>
+            <button className={rec.kind === 'daily' ? 'on' : ''} onClick={() => setRecKind('daily')}>Tous les X jours</button>
+          </div>
+
+          {rec.kind === 'weekly' && (
+            <>
+              <div className="weekdays">
+                {DAY_LETTERS.map((l, i) => (
+                  <button key={i} className={rec.days.includes(i) ? 'on' : ''} onClick={() => toggleDay(i)}>{l}</button>
+                ))}
+              </div>
+              <div className="inline-num">
+                Toutes les
+                <input type="number" inputMode="numeric" min={1} max={8} value={rec.interval} onChange={(e) => set({ recurrence: { ...rec, interval: Math.max(1, Number(e.target.value) || 1) } })} />
+                semaine{rec.interval > 1 ? 's' : ''}
+              </div>
+            </>
+          )}
+          {rec.kind === 'daily' && (
+            <div className="inline-num">
+              Tous les
+              <input type="number" inputMode="numeric" min={1} max={60} value={rec.every} onChange={(e) => set({ recurrence: { kind: 'daily', every: Math.max(1, Number(e.target.value) || 1) } })} />
+              jour{rec.every > 1 ? 's' : ''}
+            </div>
+          )}
+          {rec.kind !== 'none' && (
+            <div className="end-row">
+              <label className="toggle">
+                <input type="checkbox" checked={t.endDate !== null} onChange={(e) => set({ endDate: e.target.checked ? t.startDate : null })} />
+                <span>Date de fin</span>
+              </label>
+              {t.endDate !== null && <input type="date" value={t.endDate} onChange={(e) => e.target.value && set({ endDate: e.target.value })} />}
+            </div>
+          )}
+        </section>
+
+        <section className="group">
+          <h3 className="group-title">Notes</h3>
+          <textarea rows={2} placeholder="Pages, exercices, objectifs…" value={t.notes} onChange={(e) => set({ notes: e.target.value })} />
+        </section>
 
         {error && <p className="error">{error}</p>}
 
-        <button className="btn primary big" onClick={save}>{task ? 'Enregistrer' : 'Ajouter au planning'}</button>
-        {task && (
-          <button className="btn danger-ghost" onClick={remove}><Icon name="trash" size={18} /> Supprimer la tâche</button>
-        )}
+        <div className="sheet-actions">
+          <button className="btn primary big" onClick={save}>{task ? 'Enregistrer' : 'Ajouter au planning'}</button>
+          {task && (
+            <button className="btn danger-ghost" onClick={remove}><Icon name="trash" size={18} /> Supprimer la tâche</button>
+          )}
+        </div>
       </div>
     </Sheet>
   );
