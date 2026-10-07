@@ -1,9 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { catType, db, deleteCategory, deleteType, resetLocalDB, typeOf, uid, useSettings, useTypes, type Settings } from '../db';
+import { catType, db, deleteCategory, resetLocalDB, typeOf, uid, useSettings, useTypes, type Settings } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
 import { pickDistinctColor } from '../lib/colors';
+import { createType, removeTypeWithUndo } from '../lib/types';
 import { Icon, LiveInput, useUI } from '../ui';
 import { NotificationsCard } from './NotificationsCard';
 
@@ -83,8 +84,7 @@ export function SettingsView() {
   const types = useTypes();
 
   const addType = async () => {
-    const order = Math.max(-1, ...types.map((t) => t.order)) + 1;
-    await db.types.add({ id: uid(), name: 'Nouvelle catégorie', pomodoro: false, order });
+    await createType(types, 'Nouvelle catégorie');
     setTimeout(() => {
       const inputs = document.querySelectorAll<HTMLInputElement>('.type-name');
       const last = inputs[inputs.length - 1];
@@ -93,17 +93,7 @@ export function SettingsView() {
     }, 50);
   };
 
-  const removeType = async (id: string) => {
-    const ty = types.find((t) => t.id === id);
-    // Les tâches partent de préférence vers un type qui fonctionne pareil (avec ou sans Pomodoro)
-    const target = types.find((t) => t.id !== id && t.pomodoro === ty?.pomodoro) ?? types.find((t) => t.id !== id);
-    if (!ty || !target) return;
-    const { moved, undo } = await deleteType(id, target.id);
-    ui.toast(
-      moved ? `« ${ty.name} » supprimée · ${moved} tâche${moved > 1 ? 's' : ''} → ${target.name}` : `« ${ty.name} » supprimée`,
-      { label: 'Annuler', run: () => void undo() },
-    );
-  };
+  const removeType = (id: string) => void removeTypeWithUndo(ui, types, id);
 
   const removeCat = async (id: string, name: string) => {
     const undo = await deleteCategory(id);

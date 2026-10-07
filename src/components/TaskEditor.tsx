@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { catType, db, deleteCategory, deleteTask, typeOf, uid, useCategories, useTypes, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { pickDistinctColor } from '../lib/colors';
+import { createType, removeTypeWithUndo } from '../lib/types';
 import { Icon, Sheet, useUI } from '../ui';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
@@ -76,6 +77,31 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
     set({ type: ty, ...(cur && typeOf(catType(cur), types).id !== ty ? { categoryId: null } : {}) });
   };
 
+  // ——— Grandes catégories (révision, projet, activité…) : ajout, renommage, suppression ———
+  const [newType, setNewType] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+
+  const addType = async () => {
+    const name = newType?.trim();
+    setNewType(null);
+    if (!name) return;
+    const id = await createType(types, name);
+    switchType(id);
+  };
+
+  const saveRename = async () => {
+    const id = editingType;
+    setEditingType(null);
+    if (id && editName.trim()) await db.types.update(id, { name: editName.trim() });
+  };
+
+  const removeType = async (id: string) => {
+    const wasSelected = ty.id === id;
+    const target = await removeTypeWithUndo(ui, types, id, () => { if (wasSelected) set({ type: id }); });
+    if (target && wasSelected) set({ type: target });
+  };
+
   const removeCategory = async (id: string, name: string) => {
     const wasSelected = t.categoryId === id;
     const undo = await deleteCategory(id);
@@ -102,18 +128,63 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
           autoFocus={!task}
         />
 
-        <div className={`seg full ${types.length > 3 ? 'scroll-x' : ''}`}>
-          {types.map((o) => (
-            <button key={o.id} className={ty.id === o.id ? 'on' : ''} onClick={() => switchType(o.id)}>
-              {o.name}
-            </button>
-          ))}
+        <div className="chips type-chips">
+          {types.map((o) =>
+            editingType === o.id ? (
+              <span key={o.id} className="chip-input">
+                <input
+                  autoFocus
+                  value={editName}
+                  aria-label="Nouveau nom"
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void saveRename(); if (e.key === 'Escape') setEditingType(null); }}
+                />
+                <button onClick={saveRename}>OK</button>
+              </span>
+            ) : (
+              <span key={o.id} className={`chip removable type-chip ${ty.id === o.id ? 'on' : ''}`}>
+                <button className="chip-main" onClick={() => switchType(o.id)}>{o.name}</button>
+                {ty.id === o.id && (
+                  <button className="chip-x" onClick={() => { setEditingType(o.id); setEditName(o.name); }} aria-label={`Renommer ${o.name}`}>
+                    <Icon name="edit" size={13} />
+                  </button>
+                )}
+                {types.length > 1 && (
+                  <button className="chip-x" onClick={() => removeType(o.id)} aria-label={`Supprimer la grande catégorie ${o.name}`}>
+                    <Icon name="close" size={13} />
+                  </button>
+                )}
+              </span>
+            ),
+          )}
+          {newType === null ? (
+            <button className="chip ghost" onClick={() => setNewType('')} aria-label="Ajouter une grande catégorie"><Icon name="plus" size={14} /> Ajouter</button>
+          ) : (
+            <span className="chip-input">
+              <input
+                autoFocus
+                value={newType}
+                placeholder="Ex. Cours"
+                aria-label="Nom de la grande catégorie"
+                onChange={(e) => setNewType(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void addType(); if (e.key === 'Escape') setNewType(null); }}
+              />
+              <button onClick={addType}>OK</button>
+            </span>
+          )}
         </div>
-        <p className="hint">
-          {ty.pomodoro
-            ? `« ${ty.name} » se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.`
-            : `« ${ty.name} » se coche simplement comme fait, sans Pomodoro.`}
-        </p>
+        <div className="type-hint">
+          <p className="hint">
+            {ty.pomodoro
+              ? `« ${ty.name} » se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.`
+              : `« ${ty.name} » se coche simplement comme fait, sans Pomodoro.`}
+          </p>
+          <label className="switch" title="Mode Pomodoro">
+            <input type="checkbox" checked={ty.pomodoro} onChange={(e) => db.types.update(ty.id, { pomodoro: e.target.checked })} aria-label={`Pomodoro pour ${ty.name}`} />
+            <span className="switch-track"><span /></span>
+            <span className="switch-label">Pomodoro</span>
+          </label>
+        </div>
 
         <label className="field-label">Catégorie</label>
         <div className="chips">
