@@ -9,6 +9,7 @@ import { StatsView } from './components/Stats';
 import { TaskEditor } from './components/TaskEditor';
 import { TasksView } from './components/Tasks';
 import { AuthScreen } from './components/AuthScreen';
+import { cancelPush, refreshPushSubscription } from './lib/push';
 import { cloudEnabled, useSync } from './lib/sync';
 import { ConfirmDialog, Icon, UIContext, type AskOptions, type ReviewCtx, type UI } from './ui';
 
@@ -45,6 +46,12 @@ export default function App() {
     navigator.storage?.persist?.().catch(() => {});
   }, []);
 
+  // Notifications : on renvoie l'abonnement de cet appareil à chaque connexion / ouverture
+  const userId = sync.session?.user.id;
+  useEffect(() => {
+    if (userId) void refreshPushSubscription();
+  }, [userId]);
+
   const choose = useCallback((opts: AskOptions) => {
     resolver.current?.(null);
     setAsking(opts);
@@ -70,6 +77,7 @@ export default function App() {
       });
       if (!ok) { setReview(running.ctx); return; }
       localStorage.removeItem('cadence.activeRun');
+      void cancelPush('pomo-work', 'pomo-break');
     }
     setReview(ctx);
   }, [ask]);

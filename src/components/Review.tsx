@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { db, setOccStatus, uid, useCategories, useSettings, type Settings } from '../db';
 import { fmtDuration, todayKey } from '../lib/dates';
+import { cancelPush, schedulePush } from '../lib/push';
 import { Icon, useUI, type ReviewCtx } from '../ui';
 
 type Phase = 'ready' | 'work' | 'short' | 'long' | 'finished';
@@ -128,6 +129,27 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
     saveRun(run);
   }, [run]);
 
+  // Notifications push de fin de pomodoro / de pause (utiles quand l'app est en arrière-plan)
+  const running = timed(run.phase) && run.pausedLeft === null;
+  useEffect(() => {
+    if (!settings.notifyPomodoro || !running) {
+      void cancelPush('pomo-work', 'pomo-break');
+      return;
+    }
+    const subject = ctx.title;
+    if (run.phase === 'work') {
+      const blocks = run.blocks + 1;
+      const long = blocks % run.cfg.every === 0;
+      const breakMin = long ? run.cfg.long : run.cfg.short;
+      void schedulePush('pomo-work', run.phaseEnd, 'Pomodoro terminé ✓', `${subject} · ${long ? 'Grande pause' : 'Pause'} de ${breakMin} min`);
+      void schedulePush('pomo-break', run.phaseEnd + breakMin * 60_000, 'Pause terminée', `Lance le pomodoro ${blocks + 1} quand tu es prêt`);
+    } else {
+      void cancelPush('pomo-work');
+      void schedulePush('pomo-break', run.phaseEnd, 'Pause terminée', `Lance le pomodoro ${run.blocks + 1} quand tu es prêt`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.phase, run.phaseEnd, running, settings.notifyPomodoro]);
+
   // Empêche l'écran de se mettre en veille pendant un bloc
   useEffect(() => {
     if (!timed(run.phase) || run.pausedLeft !== null) return;
@@ -170,6 +192,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
       });
       if (!ok) return;
       saveRun(null);
+      void cancelPush('pomo-work', 'pomo-break');
       onDone();
       return;
     }
@@ -204,6 +227,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
     });
     if (ctx.taskId && ctx.occKey) await setOccStatus(ctx.taskId, ctx.date, 'done');
     saveRun(null);
+    void cancelPush('pomo-work', 'pomo-break');
     ui.toast(`Séance enregistrée : ${fmtDuration(workMinutes)}`);
     onDone();
   };
@@ -212,6 +236,7 @@ export function Review({ ctx, onMinimize, onDone }: { ctx: ReviewCtx; onMinimize
     const ok = await ui.ask({ title: 'Supprimer cette séance ?', message: 'Elle ne comptera pas dans ton bilan.', confirmLabel: 'Supprimer', danger: true });
     if (!ok) return;
     saveRun(null);
+    void cancelPush('pomo-work', 'pomo-break');
     onDone();
   };
 

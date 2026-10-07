@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/apple-touch-icon.png', 'icons/favicon.png'],
+      includeAssets: ['icons/apple-touch-icon.png', 'icons/favicon.png', 'push-sw.js'],
       manifest: {
         name: 'Cadence — planning & révisions',
         short_name: 'Cadence',
@@ -28,6 +28,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
         navigateFallback: '/index.html',
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

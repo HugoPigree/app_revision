@@ -87,6 +87,14 @@ export interface Settings {
   blocksBeforeLong: number;
   dayStartHour: number;
   dayEndHour: number;
+  /** Rappel avant une tâche, en minutes (0 = à l'heure, null = désactivé) */
+  notifyBefore: number | null;
+  /** Notification de fin de pomodoro / de pause */
+  notifyPomodoro: boolean;
+  /** Heure du récap du matin ("08:00") ou null */
+  notifyMorning: string | null;
+  /** Heure du rappel des tâches non faites ("21:00") ou null */
+  notifyEvening: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -97,6 +105,10 @@ export const DEFAULT_SETTINGS: Settings = {
   blocksBeforeLong: 4,
   dayStartHour: 7,
   dayEndHour: 23,
+  notifyBefore: 10,
+  notifyPomodoro: true,
+  notifyMorning: '08:00',
+  notifyEvening: '21:00',
 };
 
 export const PALETTE = [

@@ -5,6 +5,7 @@ import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
 import { pickDistinctColor } from '../lib/colors';
 import { Icon, LiveInput, useUI } from '../ui';
+import { NotificationsCard } from './NotificationsCard';
 
 function Stepper({ label, value, min, max, step = 1, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void }) {
   return (
@@ -141,6 +142,8 @@ export function SettingsView() {
             )}
           </section>
         )}
+
+        <NotificationsCard />
 
         <section className="card">
           <h2 className="section-title">Méthode de travail</h2>

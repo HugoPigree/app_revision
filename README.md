@@ -71,3 +71,11 @@ src/
 - Pas de notifications : une PWA hors ligne ne peut pas envoyer de rappels fiables sur iPhone. Le son de fin de bloc ne joue que si l'app est ouverte.
 - Modifier une tâche récurrente depuis sa fiche change toutes ses répétitions. Pour un seul jour, fais-la glisser dans le planning et choisis « Ce jour seulement ».
 - En cas de modification du même élément sur deux appareils hors ligne, c'est la dernière envoyée qui gagne.
+
+## Notifications
+
+Web Push (iPhone : iOS 16.4+, app ajoutée à l'écran d'accueil). À activer dans Réglages → Notifications.
+
+- Rappel avant chaque tâche (délai réglable), fin de pomodoro / de pause, récap du matin, tâches pas cochées le soir.
+- Côté serveur (Supabase) : la fonction `supabase/functions/notify-tick` est appelée chaque minute par `pg_cron`. Elle lit les tâches synchronisées, calcule les notifs à envoyer (`logic.ts`) et les envoie en Web Push chiffré (`webpush.ts`, WebCrypto, sans dépendance).
+- Tables : `cadence_push_subscriptions` (un abonnement par appareil), `cadence_scheduled_pushes` (fins de pomodoro programmées par l'app), `cadence_sent_notifications` (anti-doublons), `cadence_config` (clés VAPID et secret, lisibles uniquement par le serveur).
