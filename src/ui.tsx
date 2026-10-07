@@ -24,7 +24,7 @@ export interface UI {
   openEditor: (task?: Task, defaults?: Partial<Task>) => void;
   openOccurrence: (occ: Occurrence) => void;
   startReview: (ctx: ReviewCtx) => void;
-  toast: (msg: string) => void;
+  toast: (msg: string, action?: { label: string; run: () => void }) => void;
   /** Confirmation intégrée à l'app (remplace window.confirm, peu fiable dans une web app installée) */
   ask: (opts: AskOptions) => Promise<boolean>;
   /** Ouvre l'écran de connexion / création de compte */

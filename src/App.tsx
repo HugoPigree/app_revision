@@ -27,7 +27,7 @@ export default function App() {
   const [occ, setOcc] = useState<Occurrence | null>(null);
   // Si une séance tournait quand l'app a été fermée, on la rouvre directement
   const [review, setReview] = useState<ReviewCtx | null>(() => loadRun()?.ctx ?? null);
-  const [toast, setToast] = useState<{ msg: string; n: number } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; n: number; action?: { label: string; run: () => void } } | null>(null);
   const [asking, setAsking] = useState<AskOptions | null>(null);
   const resolver = useRef<((value: string | null) => void) | null>(null);
   const [, bump] = useState(0);
@@ -37,7 +37,7 @@ export default function App() {
 
   useEffect(() => {
     if (!toast) return;
-    const id = setTimeout(() => setToast(null), 2200);
+    const id = setTimeout(() => setToast(null), toast.action ? 4500 : 2200);
     return () => clearTimeout(id);
   }, [toast]);
 
@@ -78,7 +78,7 @@ export default function App() {
     openEditor: (task, defaults) => setEditor({ task, defaults, n: Date.now() }),
     openOccurrence: setOcc,
     startReview: (ctx) => { void startReview(ctx); },
-    toast: (msg) => setToast({ msg, n: Date.now() }),
+    toast: (msg, action) => setToast({ msg, n: Date.now(), action }),
     ask,
     choose,
     openAuth: () => setAuthOpen(true),
@@ -95,7 +95,12 @@ export default function App() {
           onSkip={() => { localStorage.setItem('cadence.skipAuth', '1'); setSkipAuth(true); setAuthOpen(false); }}
           onDone={() => { setAuthOpen(false); setTab('calendar'); ui.toast('Connecté ✓ Tes données sont synchronisées'); }}
         />
-        {toast && <div className="toast" key={toast.n}>{toast.msg}</div>}
+        {toast && (
+          <div className={`toast ${toast.action ? 'has-action' : ''}`} key={toast.n}>
+            <span>{toast.msg}</span>
+            {toast.action && <button onClick={() => { toast.action!.run(); setToast(null); }}>{toast.action.label}</button>}
+          </div>
+        )}
       </UIContext.Provider>
     );
   }
@@ -137,7 +142,12 @@ export default function App() {
           />
         )}
         {asking && <ConfirmDialog opts={asking} onAnswer={answer} />}
-        {toast && <div className="toast" key={toast.n}>{toast.msg}</div>}
+        {toast && (
+          <div className={`toast ${toast.action ? 'has-action' : ''}`} key={toast.n}>
+            <span>{toast.msg}</span>
+            {toast.action && <button onClick={() => { toast.action!.run(); setToast(null); }}>{toast.action.label}</button>}
+          </div>
+        )}
       </div>
     </UIContext.Provider>
   );

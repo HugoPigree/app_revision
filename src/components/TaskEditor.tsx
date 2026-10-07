@@ -67,11 +67,10 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   };
 
   const removeCategory = async (id: string, name: string) => {
-    const ok = await ui.ask({ title: `Supprimer « ${name} » ?`, message: 'Les tâches de cette catégorie restent, sans catégorie.', confirmLabel: 'Supprimer', danger: true });
-    if (!ok) return;
-    await deleteCategory(id);
-    if (t.categoryId === id) set({ categoryId: null });
-    ui.toast('Catégorie supprimée');
+    const wasSelected = t.categoryId === id;
+    const undo = await deleteCategory(id);
+    if (wasSelected) set({ categoryId: null });
+    ui.toast(`« ${name} » supprimée`, { label: 'Annuler', run: () => { void undo(); if (wasSelected) set({ categoryId: id }); } });
   };
 
   const addCategory = async () => {

@@ -360,7 +360,10 @@ p { margin: 0; }
   position: fixed; left: 50%; bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 86px); transform: translateX(-50%);
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600;
   z-index: 60; box-shadow: var(--shadow); animation: toast .2s ease-out; white-space: nowrap;
+  display: flex; align-items: center; gap: 14px;
 }
+.toast.has-action { padding: 6px 6px 6px 16px; }
+.toast button { color: var(--bg); font-weight: 750; padding: 6px 12px; border-radius: 999px; background: color-mix(in srgb, var(--bg) 18%, transparent); }
 @keyframes toast { from { opacity: 0; transform: translate(-50%, 8px); } }
 
 /* ——— Confirmation ——— */

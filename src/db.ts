@@ -273,11 +273,24 @@ export async function setOccStatus(taskId: string, date: string, status: OccStat
 }
 
 /** Supprime une catégorie ; ses tâches restent, sans catégorie. */
-export async function deleteCategory(id: string) {
+export async function deleteCategory(id: string): Promise<() => Promise<void>> {
+  let saved: Category | undefined;
+  let taskIds: string[] = [];
   await db.transaction('rw', db.categories, db.tasks, async () => {
+    saved = await db.categories.get(id);
+    taskIds = (await db.tasks.where('categoryId').equals(id).primaryKeys()) as string[];
     await db.categories.delete(id);
     await db.tasks.where('categoryId').equals(id).modify({ categoryId: null });
   });
+  // Renvoie une fonction pour annuler la suppression
+  return async () => {
+    if (!saved) return;
+    const cat = saved;
+    await db.transaction('rw', db.categories, db.tasks, async () => {
+      await db.categories.put(cat);
+      await db.tasks.where('id').anyOf(taskIds).modify({ categoryId: cat.id });
+    });
+  };
 }
 
 export async function deleteTask(taskId: string) {
