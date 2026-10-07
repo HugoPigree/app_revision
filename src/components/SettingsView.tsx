@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { catType, db, deleteCategory, PALETTE, resetLocalDB, uid, useSettings, type Settings, type TaskType } from '../db';
+import { catType, db, deleteCategory, PALETTE, resetLocalDB, TASK_TYPES, TYPE_LABEL, uid, useSettings, type Settings, type TaskType } from '../db';
 import { exportData, importData } from '../lib/backup';
 import { cloudEnabled, signOutAndClear, syncNow, useSync } from '../lib/sync';
 import { Icon, useUI } from '../ui';
@@ -146,12 +146,11 @@ export function SettingsView() {
 
         <section className="card cats-card">
           <h2 className="section-title">Catégories</h2>
-          {(['revision', 'activity'] as TaskType[]).map((ty) => {
+          {TASK_TYPES.map((ty) => {
             const list = cats.filter((c) => catType(c) === ty);
-            const other: TaskType = ty === 'revision' ? 'activity' : 'revision';
             return (
               <div key={ty} className="cat-group">
-                <h3 className="cat-group-title">{ty === 'revision' ? 'Révisions' : 'Activités'}</h3>
+                <h3 className="cat-group-title">{TYPE_LABEL[ty].many}</h3>
                 <ul className="cat-list">
                   {list.map((c) => (
                     <li key={c.id}>
@@ -164,24 +163,24 @@ export function SettingsView() {
                         />
                       </div>
                       <input className="cat-name" value={c.name} onChange={(e) => db.categories.update(c.id, { name: e.target.value })} />
-                      <button
+                      <select
                         className="cat-move"
-                        onClick={() => db.categories.update(c.id, { type: other })}
-                        title={`Passer dans ${other === 'revision' ? 'Révisions' : 'Activités'}`}
-                        aria-label={`Passer ${c.name} dans ${other === 'revision' ? 'Révisions' : 'Activités'}`}
+                        value={ty}
+                        onChange={(e) => db.categories.update(c.id, { type: e.target.value as TaskType })}
+                        aria-label={`Type de ${c.name}`}
                       >
-                        → {other === 'revision' ? 'Révisions' : 'Activités'}
-                      </button>
+                        {TASK_TYPES.map((o) => <option key={o} value={o}>{TYPE_LABEL[o].many}</option>)}
+                      </select>
                       <button className="icon-btn" onClick={() => removeCat(c.id, c.name)} aria-label={`Supprimer ${c.name}`}><Icon name="trash" size={18} /></button>
                     </li>
                   ))}
-                  {!list.length && <li className="muted small">Aucune catégorie.</li>}
+                  {!list.length && <li className="muted small">Aucune pour l’instant.</li>}
                 </ul>
                 <button
                   className="btn ghost add-cat"
-                  onClick={() => db.categories.add({ id: uid(), name: ty === 'revision' ? 'Nouvelle matière' : 'Nouvelle activité', color: PALETTE[cats.length % PALETTE.length], type: ty })}
+                  onClick={() => db.categories.add({ id: uid(), name: TYPE_LABEL[ty].newCat, color: PALETTE[cats.length % PALETTE.length], type: ty })}
                 >
-                  <Icon name="plus" size={16} /> {ty === 'revision' ? 'Ajouter une matière' : 'Ajouter une catégorie d’activité'}
+                  <Icon name="plus" size={16} /> Ajouter {ty === 'revision' ? 'une matière' : ty === 'project' ? 'un cours' : 'une catégorie'}
                 </button>
               </div>
             );

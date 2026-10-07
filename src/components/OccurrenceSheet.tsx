@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, deleteTask, setOccStatus, useCategories } from '../db';
+import { TYPE_LABEL, db, deleteTask, setOccStatus, useCategories } from '../db';
 import { fmtDuration, fmtLongDay, minToTime } from '../lib/dates';
 import { describeRecurrence, type Occurrence } from '../lib/recurrence';
 import { Icon, Sheet, useUI } from '../ui';
@@ -40,7 +40,7 @@ export function OccurrenceSheet({ occ, onClose }: { occ: Occurrence; onClose: ()
     <Sheet onClose={onClose}>
       <div className="occ">
         <div className="occ-tag" style={{ ['--c' as string]: cat?.color ?? 'var(--muted)' }}>
-          <i className="dot" /> {cat?.name ?? 'Sans catégorie'} · {isRev ? 'Révision' : 'Activité'}
+          <i className="dot" /> {cat?.name ?? 'Sans catégorie'} · {TYPE_LABEL[task.type].one}
         </div>
         <h2 className="occ-title">{task.title}</h2>
         <ul className="occ-meta">

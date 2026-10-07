@@ -8,7 +8,7 @@ PWA hors ligne : une fois installée sur l'iPhone, elle s'ouvre comme une vraie 
 ## Ce que fait la v1
 
 - **Planning** : vue semaine (par défaut) et vue jour. Tap sur un créneau vide → nouvelle tâche à cette heure. Glisser-déposer pour déplacer une tâche (à la souris, ou appui long au doigt ; dépose sur un jour du bandeau du haut pour changer de jour en gardant l'heure).
-- **Tâches** : ponctuelles ou récurrentes (jours fixes, toutes les X semaines, ou tous les X jours, avec date de fin optionnelle). Type *Révision* ou *Activité*, catégories en couleur.
+- **Tâches** : ponctuelles ou récurrentes (jours fixes, toutes les X semaines, ou tous les X jours, avec date de fin optionnelle). Trois types : *Révision* (mode Pomodoro), *Projet* (travail scolaire à rendre, coché quand c'est fait) et *Activité* ; chaque type a ses propres catégories en couleur.
 - **Mode révision (Pomodoro)** : pomodoros de travail + pauses (25/5 par défaut, grande pause tous les 4 pomodoros, réglable). Le pomodoro suivant ne démarre que quand tu le relances, donc seul le vrai temps de travail est compté. L'écran reste allumé pendant un pomodoro et la séance survit si tu fermes l'app.
 - **Bilan** : temps de révision par semaine/mois (avec comparaison), par jour, par catégorie, par sujet, taux de révisions faites.
 - **Réglages** : durées des blocs, plage horaire du calendrier, catégories, export/import d'une sauvegarde JSON.

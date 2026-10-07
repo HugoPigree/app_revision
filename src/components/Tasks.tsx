@@ -5,7 +5,7 @@ import { fmtDuration, relativeDay, todayKey } from '../lib/dates';
 import { describeRecurrence, nextOccurrence } from '../lib/recurrence';
 import { Icon, useUI } from '../ui';
 
-type Filter = 'all' | 'revision' | 'activity';
+type Filter = 'all' | 'revision' | 'project' | 'activity';
 
 export function TasksView() {
   const ui = useUI();
@@ -67,6 +67,7 @@ export function TasksView() {
         <div className="seg">
           <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>Toutes</button>
           <button className={filter === 'revision' ? 'on' : ''} onClick={() => setFilter('revision')}>Révisions</button>
+          <button className={filter === 'project' ? 'on' : ''} onClick={() => setFilter('project')}>Projets</button>
           <button className={filter === 'activity' ? 'on' : ''} onClick={() => setFilter('activity')}>Activités</button>
         </div>
       </header>
@@ -100,7 +101,7 @@ export function TasksView() {
         )}
         {!empty && tasks.length === 0 && <p className="muted center">Rien dans ce filtre.</p>}
       </div>
-      <button className="fab" onClick={() => ui.openEditor(undefined, filter === 'activity' ? { type: 'activity' } : undefined)} aria-label="Nouvelle tâche">
+      <button className="fab" onClick={() => ui.openEditor(undefined, filter !== 'all' ? { type: filter } : undefined)} aria-label="Nouvelle tâche">
         <Icon name="plus" size={26} />
       </button>
     </div>

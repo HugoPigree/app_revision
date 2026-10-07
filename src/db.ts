@@ -1,7 +1,15 @@
 import Dexie, { type Table, type Transaction } from 'dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 
-export type TaskType = 'revision' | 'activity';
+export type TaskType = 'revision' | 'project' | 'activity';
+
+export const TASK_TYPES: TaskType[] = ['revision', 'project', 'activity'];
+/** Libellés : [singulier, pluriel, catégorie au singulier, nouvelle catégorie] */
+export const TYPE_LABEL: Record<TaskType, { one: string; many: string; cat: string; newCat: string }> = {
+  revision: { one: 'Révision', many: 'Révisions', cat: 'Matière', newCat: 'Nouvelle matière' },
+  project: { one: 'Projet', many: 'Projets', cat: 'Cours / module', newCat: 'Nouveau cours' },
+  activity: { one: 'Activité', many: 'Activités', cat: 'Catégorie', newCat: 'Nouvelle activité' },
+};
 
 /** days : 0 = lundi … 6 = dimanche */
 export type Recurrence =
@@ -87,13 +95,15 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-perso', name: 'Perso', color: PALETTE[4], type: 'activity' },
 ];
 
-const ACTIVITY_WORDS = /sport|salle|muscu|course|running|foot|basket|tennis|natation|piscine|perso|boulot|travail|job|taf|loisir|sortie|courses|ménage|menage|projet|cuisine|jeu|lecture/i;
+const ACTIVITY_WORDS = /sport|salle|muscu|course|running|foot|basket|tennis|natation|piscine|perso|boulot|travail|job|taf|loisir|sortie|courses|ménage|menage|cuisine|jeu|lecture/i;
+const PROJECT_WORDS = /projet|rendu|dossier|exposé|expose|mémoire|memoire|\btp\b|devoir/i;
 
 /** Type d'une catégorie, avec une valeur par défaut pour les anciennes données sans type */
 export function catType(c: Category): TaskType {
   if (c.type) return c.type;
   const def = DEFAULT_CATEGORIES.find((d) => d.id === c.id);
   if (def?.type) return def.type;
+  if (PROJECT_WORDS.test(c.name)) return 'project';
   return ACTIVITY_WORDS.test(c.name) ? 'activity' : 'revision';
 }
 
@@ -104,9 +114,8 @@ export async function fixCategoryTypes(): Promise<void> {
   const tasks = await db.tasks.toArray();
   for (const c of untyped) {
     const used = tasks.filter((t) => t.categoryId === c.id);
-    const act = used.filter((t) => t.type === 'activity').length;
-    const rev = used.length - act;
-    const type: TaskType = used.length ? (act > rev ? 'activity' : act < rev ? 'revision' : catType(c)) : catType(c);
+    const counts = TASK_TYPES.map((ty) => [ty, used.filter((t) => t.type === ty).length] as const).sort((a, b) => b[1] - a[1]);
+    const type: TaskType = used.length && counts[0][1] > counts[1][1] ? counts[0][0] : catType(c);
     await db.categories.update(c.id, { type });
   }
 }

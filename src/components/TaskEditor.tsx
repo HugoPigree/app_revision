@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { catType, db, deleteCategory, deleteTask, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
+import { catType, db, deleteCategory, deleteTask, TASK_TYPES, TYPE_LABEL, uid, PALETTE, useCategories, type Recurrence, type Task, type TaskType } from '../db';
 import { DAY_LETTERS, fmtDuration, todayKey, weekday } from '../lib/dates';
 import { Icon, Sheet, useUI } from '../ui';
 
@@ -27,7 +27,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
   const [error, setError] = useState('');
   const catName = cats.find((c) => c.id === t.categoryId)?.name;
   // Sans titre, la tâche prend le nom de sa catégorie
-  const fallbackTitle = catName ?? (t.type === 'revision' ? 'Révision' : 'Activité');
+  const fallbackTitle = catName ?? TYPE_LABEL[t.type].one;
   const set = (patch: Partial<Task>) => setT((p) => ({ ...p, ...patch }));
   const rec = t.recurrence;
 
@@ -100,19 +100,21 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
         />
 
         <div className="seg full">
-          {(['revision', 'activity'] as TaskType[]).map((ty) => (
+          {TASK_TYPES.map((ty) => (
             <button key={ty} className={t.type === ty ? 'on' : ''} onClick={() => switchType(ty)}>
-              {ty === 'revision' ? 'Révision' : 'Activité'}
+              {TYPE_LABEL[ty].one}
             </button>
           ))}
         </div>
         <p className="hint">
           {t.type === 'revision'
             ? 'Une révision se lance en mode Pomodoro (travail + pauses) et compte dans ton bilan.'
-            : 'Une activité se coche simplement comme faite (sport, cours, boulot…).'}
+            : t.type === 'project'
+              ? 'Un projet à faire pour l’école (TP, dossier, exposé…). Tu le coches quand c’est fait, sans Pomodoro.'
+              : 'Une activité se coche simplement comme faite (sport, boulot, perso…).'}
         </p>
 
-        <label className="field-label">Catégorie</label>
+        <label className="field-label">{TYPE_LABEL[t.type].cat}</label>
         <div className="chips">
           <button className={`chip ${t.categoryId === null ? 'on' : ''}`} onClick={() => set({ categoryId: null })}>Aucune</button>
           {shownCats.map((c) => (
@@ -126,7 +128,7 @@ export function TaskEditor({ task, defaults, onClose }: { task?: Task; defaults?
             </span>
           ))}
           {newCat === null ? (
-            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> {t.type === 'revision' ? 'Matière' : 'Catégorie'}</button>
+            <button className="chip ghost" onClick={() => setNewCat('')}><Icon name="plus" size={14} /> {TYPE_LABEL[t.type].cat}</button>
           ) : (
             <span className="chip-input">
               <input autoFocus value={newCat} placeholder="Nom" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCategory()} />
